@@ -1048,6 +1048,13 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.usage-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .usage-title {
   font-weight: 600;
   font-size: 13px;
@@ -1097,6 +1104,23 @@ body {
 .usage-alert.danger {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.usage-upgrade-btn {
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(150, 113, 23, 0.45);
+  background: linear-gradient(135deg, #967117, #c9980a);
+  color: #141414;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.usage-upgrade-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(150, 113, 23, 0.25);
 }
 
 .chat-pane {

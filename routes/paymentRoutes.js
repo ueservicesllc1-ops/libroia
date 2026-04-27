@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const stripe = require("../lib/stripe");
 const { getDb } = require("../lib/billing/db");
+const PLATFORM_COMMISSION_PERCENT = parseInt(process.env.PLATFORM_COMMISSION_PERCENT || "20", 10);
 
 const ensureAuth = (req, res, next) => {
   if (!req.session.userId && !process.env.SKIP_AUTH) {
@@ -9,6 +10,32 @@ const ensureAuth = (req, res, next) => {
   }
   next();
 };
+
+function buildBookSettlement(book) {
+  const amountTotal = Math.max(0, Math.round(Number(book.price) || 0)); // cents in DB
+  const platformFee = Math.round(amountTotal * (PLATFORM_COMMISSION_PERCENT / 100));
+  const authorAmount = amountTotal - platformFee;
+  return { amountTotal, platformFee, authorAmount };
+}
+
+function parseCartItems(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed
+      .map((i) => ({
+        book_id: i.book_id,
+        seller_id: Number(i.seller_id),
+        amount_total: Number(i.amount_total),
+        platform_fee: Number(i.platform_fee),
+        seller_amount: Number(i.seller_amount),
+      }))
+      .filter((i) => i.book_id && Number.isFinite(i.seller_id) && Number.isFinite(i.amount_total) && Number.isFinite(i.platform_fee) && Number.isFinite(i.seller_amount));
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/payments/create-subscription-session
@@ -99,10 +126,7 @@ router.post("/create-checkout-session", ensureAuth, async (req, res) => {
     }
 
     // 5. Crear Sesión de Checkout con Metadata Blindada
-    const commissionPercent = parseInt(process.env.PLATFORM_COMMISSION_PERCENT || "20");
-    const amountTotal = Math.round(book.price * 100);
-    const platformFee = Math.round(amountTotal * (commissionPercent / 100));
-    const authorAmount = amountTotal - platformFee;
+    const { amountTotal, platformFee, authorAmount } = buildBookSettlement(book);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -137,16 +161,97 @@ router.post("/create-checkout-session", ensureAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/payments/create-cart-checkout-session
+ * Crea una sesión Stripe con múltiples libros PDF.
+ */
+router.post("/create-cart-checkout-session", ensureAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId || 1;
+    const db = getDb();
+    const ids = Array.isArray(req.body?.book_ids) ? req.body.book_ids : [];
+    const uniqueBookIds = [...new Set(ids.map((x) => String(x || "").trim()).filter(Boolean))];
+    if (!uniqueBookIds.length) {
+      return res.status(400).json({ error: "Carrito vacío." });
+    }
+
+    const selectedBooks = [];
+    for (const bookId of uniqueBookIds) {
+      const book = db.prepare("SELECT * FROM books_public WHERE id = ?").get(bookId);
+      if (!book || !book.is_published || Number(book.price) <= 0) continue;
+      if (book.author_id === userId) continue;
+      const existing = db.prepare(`
+        SELECT status FROM purchases
+        WHERE user_id = ? AND book_id = ? AND (status = 'paid' OR status = 'free')
+      `).get(userId, bookId);
+      if (existing) continue;
+      selectedBooks.push(book);
+    }
+
+    if (!selectedBooks.length) {
+      return res.status(400).json({ error: "No hay libros válidos en el carrito para cobrar." });
+    }
+
+    const lineItems = [];
+    const cartItemsMeta = [];
+    for (const book of selectedBooks) {
+      const settlement = buildBookSettlement(book);
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: book.title,
+            description: "Libro digital (PDF) - Marketplace LibroAI",
+          },
+          unit_amount: settlement.amountTotal,
+        },
+        quantity: 1,
+      });
+      cartItemsMeta.push({
+        book_id: book.id,
+        seller_id: Number(book.author_id),
+        amount_total: settlement.amountTotal,
+        platform_fee: settlement.platformFee,
+        seller_amount: settlement.authorAmount,
+      });
+    }
+
+    const cartItemsRaw = JSON.stringify(cartItemsMeta);
+    if (cartItemsRaw.length > 500) {
+      return res.status(400).json({ error: "Carrito demasiado grande para checkout único. Divide tu compra en dos pagos." });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: lineItems,
+      metadata: {
+        buyer_id: String(userId),
+        cart_items: cartItemsRaw,
+      },
+      success_url: `${process.env.APP_BASE_URL}/libroia/payment-success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_BASE_URL}/libroia/marketplace.html`,
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error("[Stripe] Cart Checkout Error:", error.message);
+    res.status(500).json({ error: "Error al procesar el checkout del carrito." });
+  }
+});
+
+/**
  * GET /api/payments/session-status/:session_id
  */
 router.get("/session-status/:session_id", async (req, res) => {
   try {
     const db = getDb();
-    const purchase = db.prepare("SELECT status FROM purchases WHERE stripe_session_id = ?").get(req.params.session_id);
-    if (purchase) {
-      return res.json({ status: purchase.status });
+    const purchases = db.prepare("SELECT status, book_id FROM purchases WHERE stripe_session_id = ?").all(req.params.session_id);
+    if (purchases && purchases.length) {
+      const paidBookIds = purchases.filter((p) => p.status === "paid").map((p) => p.book_id);
+      const status = paidBookIds.length ? "paid" : purchases[0].status;
+      return res.json({ status, paid_book_ids: paidBookIds });
     }
-    res.json({ status: "pending" });
+    res.json({ status: "pending", paid_book_ids: [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -202,18 +307,28 @@ router.post("/webhook", async (req, res) => {
 
     // ── Compra de libro ─────────────────────────────────────────────────
     try {
-      // Validar metadata antes de procesar
       const buyer_id = parseInt(meta?.buyer_id);
-      const seller_id = parseInt(meta?.author_id);
-      const amount_total = session.amount_total;
-      const platform_fee = parseInt(meta?.platform_fee);
-      const seller_amount = parseInt(meta?.author_amount);
-      const book_id = meta?.book_id;
+      const cartItems = parseCartItems(meta?.cart_items);
+      const singleBookId = meta?.book_id;
+      const singleSellerId = parseInt(meta?.author_id);
+      const singlePlatformFee = parseInt(meta?.platform_fee);
+      const singleSellerAmount = parseInt(meta?.author_amount);
 
-      // Guardar en log si la metadata está incompleta
-      if (!book_id || isNaN(buyer_id) || isNaN(seller_id) || isNaN(platform_fee) || isNaN(seller_amount)) {
+      const itemsToProcess = cartItems?.length
+        ? cartItems
+        : (singleBookId && Number.isFinite(singleSellerId) && Number.isFinite(singlePlatformFee) && Number.isFinite(singleSellerAmount))
+          ? [{
+              book_id: singleBookId,
+              seller_id: singleSellerId,
+              amount_total: Number(session.amount_total),
+              platform_fee: singlePlatformFee,
+              seller_amount: singleSellerAmount,
+            }]
+          : [];
+
+      if (!Number.isFinite(buyer_id) || !itemsToProcess.length) {
         console.error("[Webhook] ⚠️ Metadata incompleta o inválida:", {
-          book_id, buyer_id, seller_id, platform_fee, seller_amount,
+          buyer_id,
           raw_meta: meta,
         });
         // Retornar 200 para que Stripe no reintente — no se puede procesar sin metadata válida
@@ -221,43 +336,42 @@ router.post("/webhook", async (req, res) => {
       }
 
       db.transaction(() => {
-        // IDEMPOTENCIA
-        const exists = db.prepare("SELECT id FROM purchases WHERE stripe_session_id = ?").get(session.id);
-        if (exists) return;
+        for (const item of itemsToProcess) {
+          // IDEMPOTENCIA por libro/sesión
+          const exists = db.prepare("SELECT id FROM purchases WHERE stripe_session_id = ? AND book_id = ?").get(session.id, item.book_id);
+          if (exists) continue;
 
-        // 1. Guardar compra
-        const purchase = db.prepare(`
-          INSERT INTO purchases (
-            user_id, book_id, stripe_session_id, stripe_payment_intent_id,
-            amount_total, platform_fee_amount, author_amount, currency, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          buyer_id, book_id, session.id, session.payment_intent,
-          amount_total, platform_fee, seller_amount,
-          session.currency, 'paid', now
-        );
+          const purchase = db.prepare(`
+            INSERT INTO purchases (
+              user_id, book_id, stripe_session_id, stripe_payment_intent_id,
+              amount_total, platform_fee_amount, author_amount, currency, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            buyer_id, item.book_id, session.id, session.payment_intent,
+            item.amount_total, item.platform_fee, item.seller_amount,
+            session.currency, 'paid', now
+          );
 
-        // 2. Registrar venta
-        db.prepare(`
-          INSERT INTO sales (
-            seller_id, book_id, purchase_id,
-            amount_total, platform_fee_amount, seller_amount, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          seller_id, book_id, purchase.lastInsertRowid,
-          amount_total, platform_fee, seller_amount, 'paid', now
-        );
+          db.prepare(`
+            INSERT INTO sales (
+              seller_id, book_id, purchase_id,
+              amount_total, platform_fee_amount, seller_amount, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            item.seller_id, item.book_id, purchase.lastInsertRowid,
+            item.amount_total, item.platform_fee, item.seller_amount, 'paid', now
+          );
 
-        // 3. Actualizar balance del vendedor
-        db.prepare(`
-          UPDATE seller_balances 
-          SET available_balance = available_balance + ?,
-              lifetime_earnings = lifetime_earnings + ?,
-              updated_at = ?
-          WHERE seller_id = ?
-        `).run(seller_amount, seller_amount, now, seller_id);
+          db.prepare(`
+            UPDATE seller_balances 
+            SET available_balance = available_balance + ?,
+                lifetime_earnings = lifetime_earnings + ?,
+                updated_at = ?
+            WHERE seller_id = ?
+          `).run(item.seller_amount, item.seller_amount, now, item.seller_id);
+        }
       })();
-      console.log(`[Webhook] ✅ Compra y balance procesados: Libro ${book_id}`);
+      console.log(`[Webhook] ✅ Compra(s) y balance procesados: ${itemsToProcess.length} item(s)`);
     } catch (err) {
       console.error("[Webhook] ❌ Error fatal en DB:", err.message);
     }

@@ -19,6 +19,32 @@
             padding: 120px 40px 40px; /* Offset for fixed header */
         }
 
+        .top-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .btn-ghost {
+            border: 1px solid var(--border-subtle);
+            color: var(--text-white);
+            text-decoration: none;
+            padding: 10px 14px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            transition: 0.2s;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--accent-ocre);
+            color: var(--accent-ocre);
+        }
+
         /* Hero Section for Marketplace */
         .marketplace-hero {
             text-align: center;
@@ -187,10 +213,116 @@
             background: #722f37;
         }
 
+        .m-card-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .btn-cart-mini {
+            background: #111;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-white);
+            padding: 8px 10px;
+            border-radius: 2px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn-cart-mini:hover {
+            border-color: var(--accent-ocre);
+            color: var(--accent-ocre);
+        }
+
         /* Nav Correction */
         header.nav-header {
             background: rgba(10, 10, 10, 0.9);
             backdrop-filter: blur(10px);
+        }
+
+        .shop-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .shop-modal {
+            width: 100%;
+            max-width: 560px;
+            background: #141414;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 24px;
+        }
+
+        .shop-modal h3 {
+            margin: 0 0 12px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 34px;
+        }
+
+        .shop-option-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .shop-option-btn {
+            border: 1px solid var(--border-subtle);
+            padding: 12px;
+            background: #101010;
+            color: var(--text-white);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .shop-option-btn.active {
+            border-color: var(--accent-ocre);
+            color: var(--accent-ocre);
+        }
+
+        .cart-drawer {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 100%;
+            max-width: 420px;
+            height: 100vh;
+            background: #121212;
+            border-left: 1px solid var(--border-subtle);
+            z-index: 2200;
+            padding: 20px;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .cart-drawer.open { right: 0; }
+
+        .cart-item {
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .cart-meta {
+            color: var(--text-grey);
+            font-size: 12px;
+            margin-top: 4px;
         }
 
     </style>
@@ -202,21 +334,15 @@
         <div class="nav-container">
             <a href="/" class="logo">LIBRO<span>AI</span></a>
             <div class="nav-right">
-                <a href="/dashboard" class="nav-link">Ir a mi Escritorio</a>
-                <div class="user-profile" id="userProfile" style="display: none;">
-                    <img id="userAvatar" src="" alt="Profile">
-                    <div class="dropdown-menu">
-                        <a href="/dashboard"><i class="fa-solid fa-gauge"></i> Dashboard</a>
-                        <a href="/libroia"><i class="fa-solid fa-pen-nib"></i> Escribir</a>
-                        <a href="#" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Salir</a>
-                    </div>
-                </div>
-                <button class="btn btn-primary" id="loginBtn" onclick="openLoginModal()" style="display: none;">Entrar</button>
+                <a href="/" class="btn-ghost">Regresar al inicio</a>
             </div>
         </div>
     </header>
 
     <div class="m-container">
+        <div class="top-actions">
+            <button class="btn-ghost" id="openCartBtn"><i class="fa-solid fa-cart-shopping"></i> Carrito (<span id="cartCount">0</span>)</button>
+        </div>
         <section class="marketplace-hero">
             <h1>Exposición Literaria</h1>
             <p>Descubre obras maestras forjadas con la inteligencia del futuro y la pasión del pasado.</p>
@@ -236,34 +362,37 @@
         </div>
     </div>
 
-    <script src="/libroia/marketplace.js"></script>
-    <script>
-        // Minimal session check for the header
-        async function checkNavSession() {
-            try {
-                const r = await fetch("/api/auth/me");
-                const data = await r.json();
-                const profile = document.getElementById('userProfile');
-                const loginBtn = document.getElementById('loginBtn');
-                
-                if (data.user) {
-                    profile.style.display = 'flex';
-                    loginBtn.style.display = 'none';
-                    document.getElementById('userAvatar').src = data.user.avatar_url || `https://ui-avatars.com/api/?name=${data.user.email}&background=641220&color=fff`;
-                } else {
-                    profile.style.display = 'none';
-                    loginBtn.style.display = 'block';
-                }
-            } catch (e) {
-                console.error("Session check failed", e);
-            }
-        }
-        checkNavSession();
+    <div id="purchaseModal" class="shop-modal-overlay">
+        <div class="shop-modal">
+            <h3>Opciones de compra</h3>
+            <p id="purchaseBookTitle" style="color: var(--text-grey); margin: 0 0 8px;">Libro seleccionado</p>
+            <div class="shop-option-grid">
+                <button id="buyPdfOption" class="shop-option-btn active">PDF Digital</button>
+                <button id="buyPhysicalOption" class="shop-option-btn">Libro Físico</button>
+            </div>
+            <p id="purchaseHint" style="color: var(--text-grey); margin-top: 16px; font-size: 13px;">
+                PDF: acceso inmediato en tus libros comprados (requiere cuenta).
+            </p>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top: 20px;">
+                <button class="btn-ghost" id="closePurchaseModalBtn">Cancelar</button>
+                <button class="btn-buy-mini" id="addToCartConfirmBtn">Añadir al carrito</button>
+            </div>
+        </div>
+    </div>
 
-        async function logout() {
-            await fetch("/api/auth/logout", { method: "POST" });
-            window.location.href = "/";
-        }
-    </script>
+    <aside id="cartDrawer" class="cart-drawer">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+            <h3 style="margin:0; font-family:'Cormorant Garamond', serif; font-size: 32px;">Carrito</h3>
+            <button id="closeCartBtn" class="btn-ghost">Cerrar</button>
+        </div>
+        <div id="cartItemsWrap"></div>
+        <div style="margin-top:18px; border-top:1px solid var(--border-subtle); padding-top:12px;">
+            <p style="margin:0; color:var(--text-grey);" id="cartTotals">Total PDF: US$0.00</p>
+            <button id="checkoutPdfBtn" class="btn-buy-mini" style="margin-top:10px; width:100%;">Comprar PDF ahora</button>
+            <button id="checkoutPhysicalBtn" class="btn-ghost" style="margin-top:8px; width:100%;">Solicitar libros físicos</button>
+        </div>
+    </aside>
+
+    <script src="/libroia/marketplace.js"></script>
 </body>
 </html>

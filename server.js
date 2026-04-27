@@ -30,6 +30,11 @@ const DATA_DIR = path.join(__dirname, "data");
 const BOOKS_FILE = path.join(DATA_DIR, "books.json");
 const SESSION_NAME = "libro.sid";
 
+const requirePageAuth = (req, res, next) => {
+  if (req.session && req.session.userId) return next();
+  return res.redirect("/");
+};
+
 // ── Cabeceras de seguridad HTTP (helmet) ──────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -77,7 +82,7 @@ app.use((req, res, next) => {
 // ── Rutas API ─────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/billing", billingRoutes);
-app.use("/api/ai/generate", aiGenerateRoutes);
+app.use("/api/ai", aiGenerateRoutes);
 app.use("/api/books", createBooksRouter(DATA_DIR));
 app.use("/api/media", mediaRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
@@ -127,11 +132,17 @@ app.get("/escribir", (req, res) => {
 
 app.get("/libroia", (req, res) => res.redirect("/escribir"));
 app.get("/libroia/", (req, res) => res.redirect("/escribir"));
-app.get("/dashboard", (req, res) => res.sendFile(path.join(__dirname, "libroia", "library.html")));
-app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "libroia", "admin.html")));
-app.get("/library", (req, res) => res.redirect("/dashboard"));
+app.get("/dashboard", requirePageAuth, (req, res) => res.sendFile(path.join(__dirname, "libroia", "library.html")));
+app.get("/admin", requirePageAuth, (req, res) => res.sendFile(path.join(__dirname, "libroia", "admin.html")));
+app.get("/library", requirePageAuth, (req, res) => res.redirect("/dashboard"));
 app.get("/vender", (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-apply.html")));
-app.get("/vender-dashboard", (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-dashboard.html")));
+app.get("/vender-dashboard", requirePageAuth, (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-dashboard.html")));
+
+// Bloquear accesos directos a HTML internos cuando no hay sesión.
+app.get("/libroia/app.html", requirePageAuth, (req, res) => res.redirect("/escribir"));
+app.get("/libroia/library.html", requirePageAuth, (req, res) => res.redirect("/dashboard"));
+app.get("/libroia/seller-dashboard.html", requirePageAuth, (req, res) => res.redirect("/vender-dashboard"));
+app.get("/libroia/admin.html", requirePageAuth, (req, res) => res.redirect("/admin"));
 
 app.use(express.static(__dirname));
 app.use("/libroia", express.static(path.join(__dirname, "libroia")));

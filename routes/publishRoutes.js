@@ -31,7 +31,7 @@ router.post("/:id/publish", requirePlan("pro"), async (req, res) => {
   try {
     const bookId = req.params.id;
     const userId = req.session.userId || 1;
-    const { subtitle, category, language, tags } = req.body;
+    const { subtitle, category, language, tags, price } = req.body;
     
     const db = getDb();
     const admin = getFirebaseAdmin();
@@ -78,15 +78,16 @@ router.post("/:id/publish", requirePlan("pro"), async (req, res) => {
     
     const mdUrl = await uploadToB2(Buffer.from(cleanContent), mdPath, "text/markdown");
     const sampleUrl = await uploadToB2(Buffer.from(sampleContent), samplePath, "text/markdown");
+    const parsedPrice = Number.isFinite(Number(price)) ? Math.max(0, Math.round(Number(price))) : 0;
 
     // 5. Guardar en SQLite
     db.transaction(() => {
       db.prepare(`
         INSERT INTO books_public (
           id, author_id, title, subtitle, slug, description,
-          cover_url, category, language, tags, word_count,
+          cover_url, category, language, tags, price, word_count,
           reading_time_minutes, is_published, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           title = excluded.title,
           subtitle = excluded.subtitle,
@@ -96,6 +97,7 @@ router.post("/:id/publish", requirePlan("pro"), async (req, res) => {
           category = excluded.category,
           language = excluded.language,
           tags = excluded.tags,
+          price = excluded.price,
           word_count = excluded.word_count,
           reading_time_minutes = excluded.reading_time_minutes,
           is_published = 1,
@@ -103,7 +105,7 @@ router.post("/:id/publish", requirePlan("pro"), async (req, res) => {
       `).run(
         bookId, userId, bookData.title, subtitle || "", slug,
         bookData.synopsis || "Sin descripción", coverUrl,
-        category || "General", language || "es", tags || "",
+        category || "General", language || "es", tags || "", parsedPrice,
         wordCount, readingTime, now, now
       );
 

@@ -159,6 +159,47 @@
       </div>
     </div>
 
+    <div id="publishOverlay" class="login-overlay" hidden>
+      <div class="login-overlay__glow" aria-hidden="true"></div>
+      <div class="login-modal" role="dialog" aria-modal="true" aria-labelledby="publishTitle">
+        <header class="login-modal__brand">
+          <div class="login-modal__logo" aria-hidden="true">L</div>
+          <div class="login-modal__brand-text">
+            <span class="login-modal__name">Publicar en Marketplace</span>
+            <span class="login-modal__tagline">Completa los datos de publicación</span>
+          </div>
+        </header>
+        <div class="login-modal__body">
+          <h2 class="login-modal__title" id="publishTitle">Detalles de publicación</h2>
+          <div class="auth-form">
+            <label class="auth-label" for="publishAuthorInput">Autor</label>
+            <input id="publishAuthorInput" class="auth-input" type="text" placeholder="Nombre del autor" />
+
+            <label class="auth-label" for="publishPriceInput">Precio (USD)</label>
+            <input id="publishPriceInput" class="auth-input" type="number" min="0" step="0.01" placeholder="0.00" />
+
+            <label class="auth-label" for="publishCategoryInput">Categoría</label>
+            <input id="publishCategoryInput" class="auth-input" type="text" placeholder="General" />
+
+            <label class="auth-label" for="publishLanguageInput">Idioma</label>
+            <input id="publishLanguageInput" class="auth-input" type="text" placeholder="es" maxlength="8" />
+
+            <label class="auth-label" for="publishTagsInput">Tags (separados por coma)</label>
+            <input id="publishTagsInput" class="auth-input" type="text" placeholder="novela, misterio, thriller" />
+
+            <div id="publishCoverStatus" class="login-modal__hint" style="margin:6px 0 0;"></div>
+            <button type="button" id="publishUploadCoverBtn" class="btn-header-primary">Subir portada</button>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top: 12px;">
+              <button type="button" id="publishCancelBtn" class="btn-header-primary">Cancelar</button>
+              <button type="button" id="publishConfirmBtn" class="btn-header-accent">Publicar ahora</button>
+            </div>
+            <div id="publishErrorMsg" class="login-modal__error" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
     <header class="topbar">
       <div class="topbar-left">
@@ -192,13 +233,13 @@
         <div id="usagePanel" class="usage-panel" hidden>
           <div class="usage-header-row">
             <div class="usage-title">Plan <span id="planNameBadge" style="text-transform: uppercase; font-weight: bold;"></span></div>
-            <button id="upgradeBtn" class="btn btn-primary btn-small" style="background: linear-gradient(135deg, #6366f1, #a855f7);" hidden>⚡ Hazte PRO</button>
           </div>
           <div id="usageSummary" class="usage-summary muted"></div>
           <div class="usage-bar-outer">
             <div id="usageBar" class="usage-bar-inner"></div>
           </div>
           <div id="usageAlert" class="usage-alert" hidden></div>
+          <button id="upgradeBtn" class="btn usage-upgrade-btn" hidden>⚡ Hazte PRO</button>
         </div>
 
         <div class="book-meta">

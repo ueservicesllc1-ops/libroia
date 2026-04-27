@@ -63,6 +63,17 @@ const coverUploadStatus = document.getElementById("coverUploadStatus");
 const bookCoverPreview = document.getElementById("bookCoverPreview");
 const coverImg = document.getElementById("coverImg");
 const removeCoverBtn = document.getElementById("removeCoverBtn");
+const publishOverlay = document.getElementById("publishOverlay");
+const publishAuthorInput = document.getElementById("publishAuthorInput");
+const publishPriceInput = document.getElementById("publishPriceInput");
+const publishCategoryInput = document.getElementById("publishCategoryInput");
+const publishLanguageInput = document.getElementById("publishLanguageInput");
+const publishTagsInput = document.getElementById("publishTagsInput");
+const publishCoverStatus = document.getElementById("publishCoverStatus");
+const publishUploadCoverBtn = document.getElementById("publishUploadCoverBtn");
+const publishCancelBtn = document.getElementById("publishCancelBtn");
+const publishConfirmBtn = document.getElementById("publishConfirmBtn");
+const publishErrorMsg = document.getElementById("publishErrorMsg");
 
 // Onboarding
 const onboardingOverlay = document.getElementById("onboardingOverlay");
@@ -96,6 +107,27 @@ let lastSuggestion = "";
 let currentUserId = null;
 let currentUser = null;  // objeto completo del usuario (incluye plan, is_admin, etc)
 let hasUnsavedChanges = false;
+const BLOCKED_PLANS_MODAL_KEY = "libroai_blocked_plans_modal_last_shown";
+
+function shouldAutoOpenBlockedPlansModal() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const lastShown = localStorage.getItem(BLOCKED_PLANS_MODAL_KEY);
+    return lastShown !== today;
+  } catch {
+    // Fallback seguro si localStorage no está disponible.
+    return true;
+  }
+}
+
+function markBlockedPlansModalShownToday() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(BLOCKED_PLANS_MODAL_KEY, today);
+  } catch {
+    // Ignorar errores de storage silenciosamente.
+  }
+}
 
 // ─── REVISIÓN EDITORIAL CON IA ──────────────────────────────────────────
 const revOverlay = document.getElementById("revisionOverlay");
@@ -338,6 +370,49 @@ function setStatus(text) {
       loginErrorMsg.hidden = false;
     }
   }
+}
+
+function setPublishError(message) {
+  if (!publishErrorMsg) return;
+  if (!message) {
+    publishErrorMsg.hidden = true;
+    publishErrorMsg.textContent = "";
+    return;
+  }
+  publishErrorMsg.textContent = message;
+  publishErrorMsg.hidden = false;
+}
+
+function refreshPublishCoverState() {
+  if (!publishCoverStatus || !publishUploadCoverBtn) return;
+  const book = getSelectedBook();
+  if (!book) return;
+  if (book.coverUrl) {
+    publishCoverStatus.textContent = "Portada lista.";
+    publishUploadCoverBtn.textContent = "Cambiar portada";
+  } else {
+    publishCoverStatus.textContent = "Este libro no tiene portada. Sube una para publicar.";
+    publishUploadCoverBtn.textContent = "Subir portada";
+  }
+}
+
+function openPublishModal() {
+  const book = getSelectedBook();
+  if (!book || !publishOverlay) return;
+  const authorValue = (book.authorName || bookAuthorInput.value || "").trim();
+  publishAuthorInput.value = authorValue;
+  publishPriceInput.value = Number.isFinite(Number(book.price)) ? (Number(book.price) / 100).toFixed(2) : "0.00";
+  publishCategoryInput.value = book.category || "General";
+  publishLanguageInput.value = book.language || "es";
+  publishTagsInput.value = book.tags || "";
+  refreshPublishCoverState();
+  setPublishError("");
+  publishOverlay.hidden = false;
+}
+
+function closePublishModal() {
+  if (publishOverlay) publishOverlay.hidden = true;
+  setPublishError("");
 }
 
 function getSelectedBook() {
@@ -587,6 +662,7 @@ async function refreshUsagePanel() {
     if (planNameBadge) planNameBadge.textContent = u.plan || "Free";
     if (upgradeBtn) {
       upgradeBtn.hidden = u.plan !== "free";
+      upgradeBtn.textContent = "⚡ Hazte PRO";
     }
     const used = Number(u.included_tokens_used);
     const limit = Number(u.included_tokens_limit);
@@ -619,7 +695,16 @@ async function refreshUsagePanel() {
       usageAlert.hidden = false;
       usageAlert.classList.add("danger");
       usageAlert.textContent =
-        "Has alcanzado el 100% de tus tokens incluidos. Espera al proximo ciclo o usa Sonnet PRO (pago aparte).";
+        "Llegaste al 100% de tus tokens del plan FREE. Hazte PRO para seguir escribiendo ahora mismo y desbloquear 3,000,000 tokens/mes.";
+      if (upgradeBtn) {
+        upgradeBtn.hidden = false;
+        upgradeBtn.textContent = "🚀 Ver planes PRO";
+      }
+      if (shouldAutoOpenBlockedPlansModal()) {
+        const plansModal = document.getElementById("plansModal");
+        if (plansModal) plansModal.hidden = false;
+        markBlockedPlansModalShownToday();
+      }
     } else if (u.included_alert_80) {
       usageBar.classList.add("usage-bar-warn");
       usageAlert.hidden = false;
@@ -950,30 +1035,7 @@ saveBtn.addEventListener("click", () => {
 publishBtn.addEventListener("click", async () => {
   const book = getSelectedBook();
   if (!book) return;
-  
-  const btnText = document.getElementById("publishBtnText");
-  
-  if (confirm(`¿Estás listo para PUBLICAR "${book.title}" al Marketplace?`)) {
-    setStatus("Publicando...");
-    publishBtn.disabled = true;
-    btnText.textContent = "Publicando...";
-    
-    try {
-      const res = await fetch(`/api/publish/${book.id}/publish`, { method: "POST", ...fetchOpts });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      
-      alert("¡Libro publicado con éxito! Ya puedes verlo en el Marketplace.");
-      window.open("/marketplace.html", "_blank");
-      setStatus("Libro publicado");
-    } catch (err) {
-      alert("Error al publicar: " + err.message);
-      setStatus("Error al publicar");
-    } finally {
-      publishBtn.disabled = false;
-      btnText.textContent = "Publicar";
-    }
-  }
+  openPublishModal();
 });
 
 saveBookMetaBtn.addEventListener("click", () => {
@@ -1016,6 +1078,9 @@ bookCoverFile.addEventListener("change", async (e) => {
     // Guardar en Firestore inmediatamente
     await saveBookMeta();
     setStatus("Portada actualizada.");
+    if (publishOverlay && !publishOverlay.hidden) {
+      refreshPublishCoverState();
+    }
   } catch (err) {
     console.error(err);
     coverUploadStatus.textContent = "Error";
@@ -1033,6 +1098,88 @@ removeCoverBtn.addEventListener("click", async () => {
     coverImg.src = "";
     coverUploadStatus.textContent = "Sin archivo";
     await saveBookMeta();
+    if (publishOverlay && !publishOverlay.hidden) {
+      refreshPublishCoverState();
+    }
+  }
+});
+
+publishUploadCoverBtn?.addEventListener("click", () => {
+  bookCoverFile.click();
+});
+
+publishCancelBtn?.addEventListener("click", () => {
+  closePublishModal();
+});
+
+publishOverlay?.addEventListener("click", (e) => {
+  if (e.target === publishOverlay) closePublishModal();
+});
+
+publishConfirmBtn?.addEventListener("click", async () => {
+  const book = getSelectedBook();
+  if (!book) return;
+
+  const authorName = publishAuthorInput.value.trim();
+  const priceUsd = Number(publishPriceInput.value);
+  const category = publishCategoryInput.value.trim() || "General";
+  const language = publishLanguageInput.value.trim() || "es";
+  const tags = publishTagsInput.value.trim();
+
+  if (!authorName) {
+    setPublishError("El autor es obligatorio para publicar.");
+    return;
+  }
+  if (!Number.isFinite(priceUsd) || priceUsd < 0) {
+    setPublishError("El precio debe ser un número válido mayor o igual a 0.");
+    return;
+  }
+  if (!book.coverUrl) {
+    setPublishError("Sube una portada antes de publicar.");
+    return;
+  }
+
+  try {
+    setPublishError("");
+    setStatus("Guardando metadatos de publicación...");
+    publishConfirmBtn.disabled = true;
+    publishConfirmBtn.textContent = "Publicando...";
+    publishBtn.disabled = true;
+
+    // Guardar metadatos en el libro base antes de publicar
+    book.authorName = authorName;
+    book.price = Math.round(priceUsd * 100);
+    book.category = category;
+    book.language = language;
+    book.tags = tags;
+    bookAuthorInput.value = authorName;
+    await saveBookMeta();
+
+    const res = await fetch(`/api/publish/${book.id}/publish`, {
+      method: "POST",
+      ...fetchOpts,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        category,
+        language,
+        tags,
+        price: Math.round(priceUsd * 100),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudo publicar.");
+
+    closePublishModal();
+    setStatus("Libro publicado");
+    alert("¡Libro publicado con éxito! Ya está visible en Marketplace.");
+    window.open("/libroia/marketplace.html", "_blank");
+  } catch (err) {
+    setPublishError(err.message || "Error al publicar.");
+    setStatus("Error al publicar");
+  } finally {
+    publishConfirmBtn.disabled = false;
+    publishConfirmBtn.textContent = "Publicar ahora";
+    publishBtn.disabled = false;
   }
 });
 

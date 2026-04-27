@@ -34,6 +34,25 @@
                 const data = await res.json();
 
                 if (data.status === "paid") {
+                    // Limpiar solo los PDFs realmente pagados en esta sesión.
+                    try {
+                        const paidIds = Array.isArray(data.paid_book_ids) ? data.paid_book_ids.map(String) : [];
+                        const CART_KEY = "libroai_marketplace_cart_v1";
+                        const raw = localStorage.getItem(CART_KEY);
+                        if (raw) {
+                            const cart = JSON.parse(raw);
+                            if (Array.isArray(cart)) {
+                                const next = cart.filter((item) => {
+                                    if ((item.format || "") !== "pdf") return true;
+                                    return !paidIds.includes(String(item.book_id));
+                                });
+                                localStorage.setItem(CART_KEY, JSON.stringify(next));
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("No se pudo limpiar carrito tras pago:", e);
+                    }
+
                     document.getElementById("statusIcon").textContent = "✅";
                     document.getElementById("statusTitle").textContent = "¡Pago Confirmado!";
                     document.getElementById("statusMsg").textContent = "Tu libro ya está disponible en tu biblioteca.";
