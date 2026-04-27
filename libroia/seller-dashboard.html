@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Vendedor | LibroAI</title>
+    <link rel="stylesheet" href="/libroia/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { background: #0f172a; color: white; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 260px; background: #1e293b; display: flex; flex-direction: column; padding: 30px 20px; border-right: 1px solid rgba(255,255,255,0.05); }
+        .nav-link { display: flex; align-items: center; gap: 12px; padding: 12px 15px; color: #94a3b8; text-decoration: none; border-radius: 10px; margin-bottom: 10px; transition: 0.3s; font-size: 14px; }
+        .nav-link.active, .nav-link:hover { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+        .main-content { flex: 1; padding: 40px; overflow-y: auto; }
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
+        .card { background: #1e293b; padding: 25px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .card-val { font-size: 28px; font-weight: 800; margin: 5px 0; }
+        .card-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .payout-btn { background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+        .payout-btn:disabled { background: #334155; cursor: not-allowed; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { text-align: left; padding: 15px; color: #94a3b8; font-size: 12px; }
+        td { padding: 15px; border-top: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div style="font-size: 20px; font-weight: 800; margin-bottom: 40px;"><i class="fa-solid fa-store"></i> Seller Studio</div>
+        <nav>
+            <a href="#" class="nav-link active"><i class="fa-solid fa-chart-line"></i> Resumen</a>
+            <a href="/dashboard" class="nav-link"><i class="fa-solid fa-pen-nib"></i> Editor</a>
+            <a href="/library" class="nav-link"><i class="fa-solid fa-book"></i> Biblioteca</a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+            <h1>Mis Finanzas</h1>
+            <button id="requestPayoutBtn" class="payout-btn">Solicitar Pago</button>
+        </header>
+
+        <div class="stats-row">
+            <div class="card">
+                <div class="card-label">Balance Disponible</div>
+                <div id="availBalance" class="card-val">$0.00</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Ingreso Total (Neto)</div>
+                <div id="netEarnings" class="card-val">$0.00</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Libros Publicados</div>
+                <div id="booksCount" class="card-val">0</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Ventas Totales</div>
+                <div id="salesCount" class="card-val">0</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Tus Libros</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Precio</th>
+                        <th>Ventas</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="booksTable"></tbody>
+            </table>
+        </div>
+
+        <div class="card" style="margin-top: 30px;">
+            <h3>Historial de Pagos</h3>
+            <table id="payoutsTable">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Monto</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function loadDashboard() {
+            const r = await fetch("/api/seller/dashboard");
+            const data = await r.json();
+            if (data.error) {
+                alert(data.error);
+                window.location.href = "/vender";
+                return;
+            }
+
+            document.getElementById("availBalance").textContent = `$${(data.balance.available_balance / 100).toFixed(2)}`;
+            document.getElementById("netEarnings").textContent = `$${(data.balance.lifetime_earnings / 100).toFixed(2)}`;
+            document.getElementById("booksCount").textContent = data.books.length;
+            document.getElementById("salesCount").textContent = data.stats.total_sales;
+
+            const bTable = document.getElementById("booksTable");
+            bTable.innerHTML = data.books.map(b => `
+                <tr>
+                    <td><strong>${b.title}</strong></td>
+                    <td>$${(b.price / 100).toFixed(2)}</td>
+                    <td>${b.sales_count}</td>
+                    <td>${b.is_published ? "Publicado" : "Borrador"}</td>
+                </tr>
+            `).join("");
+
+            const pTable = document.getElementById("payoutsTable").querySelector("tbody");
+            pTable.innerHTML = data.payouts.map(p => `
+                <tr>
+                    <td>${new Date(p.created_at).toLocaleDateString()}</td>
+                    <td>$${(p.amount / 100).toFixed(2)}</td>
+                    <td><span style="color: ${p.status === 'paid' ? '#10b981' : '#f59e0b'}">${p.status.toUpperCase()}</span></td>
+                </tr>
+            `).join("");
+
+            const payoutBtn = document.getElementById("requestPayoutBtn");
+            payoutBtn.disabled = data.balance.available_balance < 1000; // Min $10
+            payoutBtn.onclick = async () => {
+                const amount = data.balance.available_balance;
+                if (!confirm(`¿Solicitar pago de $${(amount/100).toFixed(2)}?`)) return;
+                const res = await fetch("/api/seller/request-payout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ amount })
+                });
+                const dr = await res.json();
+                if (dr.success) {
+                    alert(dr.message);
+                    loadDashboard();
+                } else {
+                    alert(dr.error);
+                }
+            };
+        }
+        loadDashboard();
+    </script>
+</body>
+</html>

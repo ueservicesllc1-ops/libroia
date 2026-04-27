@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LibroAI | El Renacimiento Literario</title>
+    <link rel="stylesheet" href="landing.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="logo">
+            LIBRO<span>AI</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="#about">El Estudio</a></li>
+                <li><a href="/libroia/marketplace.html">Biblioteca</a></li>
+                <li><a href="#stats">Estadísticas</a></li>
+                <li><a href="/vender">Vender</a></li>
+            </ul>
+        </nav>
+        <div class="header-btns" id="authBtns">
+            <button class="btn btn-outline" onclick="openLoginModal()">Iniciar sesión</button>
+            <button class="btn btn-primary" onclick="openLoginModal()">Comenzar ahora</button>
+        </div>
+        <div class="user-menu" id="userMenu" style="display: none;">
+            <div class="user-profile" onclick="toggleUserDropdown()">
+                <img id="userAvatar" src="https://ui-avatars.com/api/?name=User&background=641220&color=fff" alt="Profile">
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="user-dropdown" id="userDropdown">
+                <div class="dropdown-header">
+                    <span id="userEmailDisplay">usuario@correo.com</span>
+                </div>
+                <a href="/dashboard"><i class="fa-solid fa-book"></i> Mi Biblioteca</a>
+                <a href="/libroia" id="writerLink" style="display: none;"><i class="fa-solid fa-feather-pointed"></i> Mi Escritorio</a>
+                <a href="/vender-dashboard" id="sellerDashLink" style="display: none;"><i class="fa-solid fa-gauge"></i> Panel Vendedor</a>
+                <a href="/admin" id="adminLink" style="display: none;"><i class="fa-solid fa-shield-halved"></i> Admin Maestro</a>
+                <a href="#"><i class="fa-solid fa-gear"></i> Ajustes</a>
+                <hr>
+                <a href="#" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Salir</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+            <div class="modal-header">
+                <h2>Bienvenido a LibroAI</h2>
+                <p>Tu viaje literario comienza aquí.</p>
+            </div>
+            <div class="auth-tabs">
+                <button id="tabLogin" class="active" onclick="setAuthMode('login')">Entrar</button>
+                <button id="tabRegister" onclick="setAuthMode('register')">Crear Cuenta</button>
+            </div>
+            <form id="landingAuthForm">
+                <div class="form-group">
+                    <label>Correo Electrónico</label>
+                    <input type="email" id="authEmail" placeholder="ejemplo@correo.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="authPassword" placeholder="********" required>
+                </div>
+                <div class="form-group" id="confirmPassGroup" style="display: none;">
+                    <label>Confirmar Contraseña</label>
+                    <input type="password" id="authPassword2" placeholder="********">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;" id="authSubmitBtn">Entrar</button>
+                <div id="authError" style="color: #ff4d4d; margin-top: 15px; font-size: 14px; text-align: center;"></div>
+                
+                <div style="margin: 20px 0; text-align: center; color: var(--text-grey); font-size: 12px; position: relative;">
+                    <span style="background: #1a1a1a; padding: 0 10px; position: relative; z-index: 1;">O continuar con</span>
+                    <hr style="position: absolute; top: 50%; width: 100%; border: 0; border-top: 1px solid var(--border-subtle); z-index: 0;">
+                </div>
+                
+                <button type="button" class="btn btn-outline" style="width: 100%; gap: 10px;" onclick="handleGoogleLogin()">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18">
+                    Google
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Escribe tu libro.<br><span>Trasciende.</span></h1>
+                <p>La tecnología de vanguardia se une a la elegancia clásica. Crea, publica y vende tus obras en una plataforma diseñada para el autor que busca la excelencia.</p>
+                <div style="display: flex; gap: 20px;">
+                    <a href="/libroia" class="btn btn-primary" style="padding: 16px 40px; font-size: 14px;">Comenzar mi obra</a>
+                    <a href="/libroia/marketplace.html" class="btn btn-outline" style="padding: 16px 40px; font-size: 14px;">Explorar biblioteca</a>
+                </div>
+            </div>
+            <div class="hero-mockup">
+                <img src="./libroia_elegant_wine_mockup_1777240835114.png" alt="Elegance Preview">
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" id="about">
+            <h2 class="section-title">El Arte de la Publicación Moderna</h2>
+            <div class="f-grid">
+                <div class="f-card">
+                    <div class="f-icon"><i class="fa-solid fa-feather-pointed"></i></div>
+                    <h3>Escritura Pura</h3>
+                    <p style="color: var(--text-grey); font-size: 14px;">Asistente de IA de clase mundial que refina tu prosa respetando tu voz única.</p>
+                </div>
+                <div class="f-card">
+                    <div class="f-icon"><i class="fa-solid fa-scroll"></i></div>
+                    <h3>Curaduría Digital</h3>
+                    <p style="color: var(--text-grey); font-size: 14px;">Transformamos tus borradores en ediciones digitales de alta calidad técnica.</p>
+                </div>
+                <div class="f-card">
+                    <div class="f-icon"><i class="fa-solid fa-coins"></i></div>
+                    <h3>Soberanía Total</h3>
+                    <p style="color: var(--text-grey); font-size: 14px;">Tú controlas el valor de tu obra. Recibe pagos directos y transparentes.</p>
+                </div>
+                <div class="f-card">
+                    <div class="f-icon"><i class="fa-solid fa-compass"></i></div>
+                    <h3>Visión Global</h3>
+                    <p style="color: var(--text-grey); font-size: 14px;">Estadísticas en tiempo real sobre el impacto de tu historia en el mundo.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Marketplace Section -->
+        <section class="marketplace-section" style="padding: 120px 10%;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 60px;">
+                <h2 style="font-family: Cormorant Garamond; font-size: 48px;">Obras Destacadas</h2>
+                <a href="/libroia/marketplace.html" style="color: var(--accent-ocre); text-decoration: none; font-weight: 600;">Ver toda la colección →</a>
+            </div>
+            
+            <div class="b-grid">
+                <!-- Book Cards -->
+                <div class="b-card">
+                    <div class="b-cover"><img src="https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=400"></div>
+                    <div class="b-info">
+                        <h4>El Código Infinito</h4>
+                        <p>Elena Vazquez</p>
+                    </div>
+                </div>
+                <div class="b-card">
+                    <div class="b-cover"><img src="https://images.unsplash.com/photo-1543003968-2409200f3003?q=80&w=400"></div>
+                    <div class="b-info">
+                        <h4>Sombras del Tiempo</h4>
+                        <p>Marco Polo</p>
+                    </div>
+                </div>
+                <div class="b-card">
+                    <div class="b-cover"><img src="https://images.unsplash.com/photo-1532012197367-2d5970d37e1b?q=80&w=400"></div>
+                    <div class="b-info">
+                        <h4>Crónicas de Orión</h4>
+                        <p>Sarah Drasner</p>
+                    </div>
+                </div>
+                <div class="b-card">
+                    <div class="b-cover"><img src="https://images.unsplash.com/photo-1495446815901-a7297e633e8d?q=80&w=400"></div>
+                    <div class="b-info">
+                        <h4>El Silencio Blanco</h4>
+                        <p>Juan Perez</p>
+                    </div>
+                </div>
+                <div class="b-card">
+                    <div class="b-cover"><img src="https://images.unsplash.com/photo-1589998059171-988d887df646?q=80&w=400"></div>
+                    <div class="b-info">
+                        <h4>Más Allá del Límite</h4>
+                        <p>Alex Rivers</p>
+                    </div>
+                </div>
+                <div class="b-card">
+                    <div class="b-cover"><img src="https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=400"></div>
+                    <div class="b-info">
+                        <h4>El Eco del Alma</h4>
+                        <p>Laura Sánchez</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final CTA -->
+        <section class="cta-final">
+            <h2>Comienza tu Legado</h2>
+            <p style="color: var(--text-grey); font-size: 18px; margin-bottom: 40px;">No solo escribas un libro. Crea una obra maestra eterna.</p>
+            <a href="/libroia" class="btn btn-primary" style="padding: 20px 60px; font-size: 16px;">Iniciar Escritura</a>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-col">
+                <div class="logo" style="margin-bottom: 20px;">LIBRO<span>AI</span></div>
+                <p style="color: var(--text-grey); font-size: 14px;">El estándar de oro para el autor contemporáneo.</p>
+            </div>
+            <div class="footer-col">
+                <h5>Colección</h5>
+                <ul>
+                    <li><a href="/libroia/marketplace.html">Marketplace</a></li>
+                    <li><a href="#">Best Sellers</a></li>
+                    <li><a href="#">Nuevos Talentos</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h5>Escritores</h5>
+                <ul>
+                    <li><a href="/published.html">Dashboard</a></li>
+                    <li><a href="#">Guía Editorial</a></li>
+                    <li><a href="#">Recursos</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h5>Estudio</h5>
+                <ul>
+                    <li><a href="#">Sobre nosotros</a></li>
+                    <li><a href="#">Privacidad</a></li>
+                    <li><a href="#">Contacto</a></li>
+                </ul>
+            </div>
+        </div>
+        <div style="margin-top: 80px; text-align: center; font-size: 12px; color: var(--text-grey); letter-spacing: 1px;">
+            © 2026 LIBROAI STUDIO. TODOS LOS DERECHOS RESERVADOS.
+        </div>
+    </footer>
+    <script type="module">
+      // ── Cargar config Firebase desde el servidor ────────────────────────────
+      let firebaseConfig = {};
+      try {
+        const cfgRes = await fetch("/api/config/firebase");
+        if (cfgRes.ok) firebaseConfig = await cfgRes.json();
+      } catch (e) {
+        console.error("[LibroAI] No se pudo cargar la config de Firebase:", e);
+      }
+
+      // ── Imports dinámicos ─────────────────
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js");
+      const { getAuth, signInWithPopup, GoogleAuthProvider } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js");
+
+      if (firebaseConfig.apiKey) {
+          const app = initializeApp(firebaseConfig);
+          const auth = getAuth(app);
+
+          // Exponer globalmente para que landing.js pueda usarlos
+          window.firebaseAuth = auth;
+          window.firebaseSignInWithPopup = signInWithPopup;
+          window.firebaseGoogleProvider = new GoogleAuthProvider();
+      }
+    </script>
+    <script src="landing.js"></script>
+</body>
+</html>

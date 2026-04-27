@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Gracias por tu compra! | LibroAI</title>
+    <link rel="stylesheet" href="./styles.css">
+    <style>
+        body { background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
+        .s-card { background: #1e293b; padding: 40px; border-radius: 20px; text-align: center; max-width: 400px; border: 1px solid rgba(255,255,255,0.1); }
+        .s-icon { font-size: 60px; margin-bottom: 20px; }
+        .s-loader { border: 4px solid #334155; border-top: 4px solid #6366f1; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="s-card">
+        <div id="statusIcon" class="s-icon">⏳</div>
+        <h1 id="statusTitle">Procesando pago...</h1>
+        <p id="statusMsg">Estamos confirmando tu transacción con Stripe.</p>
+        <div id="loader" class="s-loader"></div>
+        <div id="actions" style="margin-top: 30px;" hidden>
+            <button id="mainBtn" class="btn btn-primary" style="width: 100%;">Empezar a leer</button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get("session_id");
+
+        async function checkStatus() {
+            try {
+                const res = await fetch(`/api/payments/session-status/${sessionId}`);
+                const data = await res.json();
+
+                if (data.status === "paid") {
+                    document.getElementById("statusIcon").textContent = "✅";
+                    document.getElementById("statusTitle").textContent = "¡Pago Confirmado!";
+                    document.getElementById("statusMsg").textContent = "Tu libro ya está disponible en tu biblioteca.";
+                    document.getElementById("loader").hidden = true;
+                    document.getElementById("actions").hidden = false;
+                    document.getElementById("mainBtn").onclick = () => window.location.href = "/libroia/marketplace.html?tab=library";
+                } else {
+                    // Reintentar en 2 segundos
+                    setTimeout(checkStatus, 2000);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        if (sessionId) checkStatus();
+        else window.location.href = "/libroia/marketplace.html";
+    </script>
+</body>
+</html>

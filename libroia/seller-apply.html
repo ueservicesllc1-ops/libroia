@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activar Perfil Vendedor | LibroAI</title>
+    <link rel="stylesheet" href="/landing.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { 
+            background-color: var(--bg-black);
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .apply-card { 
+            background: #141414; 
+            padding: 60px; 
+            border-radius: 4px; 
+            width: 100%; 
+            max-width: 550px; 
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 42px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: var(--text-grey);
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        .form-group { margin-bottom: 25px; }
+        
+        label { 
+            display: block; 
+            margin-bottom: 10px; 
+            color: var(--text-grey); 
+            font-size: 12px; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        input, textarea, select { 
+            width: 100%; 
+            padding: 15px; 
+            border-radius: 2px; 
+            background: #0a0a0a; 
+            border: 1px solid var(--border-subtle); 
+            color: white; 
+            font-family: 'Montserrat', sans-serif;
+            transition: 0.3s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-ocre);
+        }
+
+        .btn-submit { 
+            width: 100%; 
+            padding: 18px; 
+            font-weight: 700; 
+            margin-top: 20px; 
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        #statusMsg {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 2px;
+            text-align: center;
+            font-size: 14px;
+            display: none;
+            border: 1px solid transparent;
+        }
+
+        .status-pending {
+            background: rgba(150, 113, 23, 0.1);
+            color: var(--accent-ocre);
+            border-color: rgba(150, 113, 23, 0.2);
+        }
+
+        .status-rejected {
+            background: rgba(91, 28, 35, 0.1);
+            color: #ff4d4d;
+            border-color: rgba(91, 28, 35, 0.2);
+        }
+
+        .back-link {
+            display: block;
+            margin-top: 30px;
+            text-align: center;
+            color: var(--text-grey);
+            font-size: 12px;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--text-white);
+        }
+
+        /* Decorative background element */
+        .bg-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(91, 28, 35, 0.15) 0%, transparent 70%);
+            z-index: 1;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-glow"></div>
+
+    <div class="apply-card">
+        <h1>Vende tus obras</h1>
+        <p class="subtitle">Únete a la élite literaria y comienza a generar ingresos con tu talento.</p>
+        
+        <form id="applyForm">
+            <div class="form-group">
+                <label>Nombre Artístico o Editorial</label>
+                <input type="text" id="display_name" required placeholder="Ej: Elena Vazquez o Editorial Phoenix">
+            </div>
+            <div class="form-group">
+                <label>Semblanza del Autor</label>
+                <textarea id="bio" rows="3" placeholder="Describe brevemente tu trayectoria y visión..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Preferencia de Cobro</label>
+                <select id="payout_method">
+                    <option value="paypal">PayPal (Recomendado)</option>
+                    <option value="transfer">Transferencia Bancaria Directa</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Cuenta de Recepción</label>
+                <input type="email" id="payout_email" required placeholder="email@ejemplo.com">
+            </div>
+            
+            <div id="statusMsg"></div>
+            
+            <button type="submit" class="btn btn-primary btn-submit">Enviar Solicitud de Ingreso</button>
+        </form>
+        
+        <a href="/dashboard" class="back-link">
+            <i class="fa-solid fa-arrow-left"></i> Volver a mi Biblioteca
+        </a>
+    </div>
+
+    <script>
+        const form = document.getElementById("applyForm");
+        const statusMsg = document.getElementById("statusMsg");
+
+        async function checkStatus() {
+            try {
+                const r = await fetch("/api/seller/profile");
+                const data = await r.json();
+                if (data.profile) {
+                    if (data.profile.status === 'approved') {
+                        window.location.href = "/vender-dashboard";
+                    } else if (data.profile.status === 'pending') {
+                        statusMsg.style.display = "block";
+                        statusMsg.className = "status-pending";
+                        statusMsg.innerHTML = '<i class="fa-solid fa-clock"></i> Tu solicitud está en revisión editorial. Te notificaremos pronto.';
+                        form.querySelector('button').disabled = true;
+                        form.style.opacity = "0.5";
+                    } else if (data.profile.status === 'rejected') {
+                        statusMsg.style.display = "block";
+                        statusMsg.className = "status-rejected";
+                        statusMsg.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Solicitud no aprobada. Puedes actualizar tus datos e intentar de nuevo.';
+                    }
+                }
+            } catch (e) {}
+        }
+        
+        checkStatus();
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button');
+            btn.textContent = "Procesando...";
+            btn.disabled = true;
+
+            const body = {
+                display_name: document.getElementById("display_name").value,
+                bio: document.getElementById("bio").value,
+                payout_method: document.getElementById("payout_method").value,
+                payout_email: document.getElementById("payout_email").value
+            };
+
+            try {
+                const r = await fetch("/api/seller/apply", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const res = await r.json();
+                if (res.success) {
+                    checkStatus();
+                } else {
+                    alert(res.error || "Ocurrió un error");
+                    btn.textContent = "Enviar Solicitud de Ingreso";
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert("Error de conexión");
+                btn.textContent = "Enviar Solicitud de Ingreso";
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

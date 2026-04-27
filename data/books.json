@@ -1,0 +1,21 @@
+{
+  "books": [
+    {
+      "id": "book-default",
+      "title": "Profetas de este tiempo",
+      "synopsis": "",
+      "createdAt": "2026-04-23T18:24:57.668Z",
+      "updatedAt": "2026-04-23T23:29:59.872Z",
+      "chapters": [
+        {
+          "id": "chapter-1",
+          "title": "Capitulo 1",
+          "content": "",
+          "createdAt": "2026-04-23T18:24:57.669Z",
+          "updatedAt": "2026-04-23T23:29:33.887Z"
+        }
+      ],
+      "user_id": 1
+    }
+  ]
+}

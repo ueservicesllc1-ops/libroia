@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Ventas | LibroAI</title>
+    <link rel="stylesheet" href="./styles.css">
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .s-container { max-width: 1100px; margin: 40px auto; padding: 20px; }
+        .s-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .summary-card { background: #1e293b; padding: 25px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); }
+        .summary-val { font-size: 2rem; font-weight: 800; color: #10b981; }
+        .summary-label { font-size: 12px; color: #64748b; text-transform: uppercase; margin-top: 5px; }
+        .s-table-container { background: #1e293b; border-radius: 16px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(255,255,255,0.03); text-align: left; padding: 15px; font-size: 13px; color: #94a3b8; }
+        td { padding: 15px; border-top: 1px solid rgba(255,255,255,0.05); }
+        .status-paid { color: #10b981; font-weight: 700; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="s-container">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1>Mis Ventas</h1>
+            <a href="/libroia/published.html" class="btn btn-secondary">Volver al Panel</a>
+        </header>
+
+        <div class="s-summary">
+            <div class="summary-card">
+                <div id="totalSales" class="summary-val">$0.00</div>
+                <div class="summary-label">Ingreso Bruto</div>
+            </div>
+            <div class="summary-card">
+                <div id="totalCommission" class="summary-val" style="color: #f43f5e;">$0.00</div>
+                <div class="summary-label">Comisión Plataforma</div>
+            </div>
+            <div class="summary-card">
+                <div id="netEarnings" class="summary-val" style="color: #6366f1;">$0.00</div>
+                <div class="summary-label">Ingreso Neto</div>
+            </div>
+        </div>
+
+        <div class="s-table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Libro</th>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Tus Ganancias</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="salesTable">
+                    <!-- Datos -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function loadSales() {
+            try {
+                const res = await fetch("/api/marketplace/dashboard/sales");
+                const sales = await res.json();
+                
+                let totalBruto = 0;
+                let totalComision = 0;
+                let totalNeto = 0;
+
+                const table = document.getElementById("salesTable");
+                table.innerHTML = "";
+
+                sales.forEach(s => {
+                    totalBruto += s.amount_total;
+                    totalComision += s.platform_fee_amount;
+                    totalNeto += s.author_amount;
+
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td><strong>${s.book_title}</strong></td>
+                        <td>${new Date(s.created_at).toLocaleDateString()}</td>
+                        <td>$${(s.amount_total / 100).toFixed(2)}</td>
+                        <td style="color: #6366f1; font-weight: 700;">$${(s.author_amount / 100).toFixed(2)}</td>
+                        <td><span class="status-paid">PAGADO</span></td>
+                    `;
+                    table.appendChild(row);
+                });
+
+                document.getElementById("totalSales").textContent = `$${(totalBruto / 100).toFixed(2)}`;
+                document.getElementById("totalCommission").textContent = `-$${(totalComision / 100).toFixed(2)}`;
+                document.getElementById("netEarnings").textContent = `$${(totalNeto / 100).toFixed(2)}`;
+
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        loadSales();
+    </script>
+</body>
+</html>

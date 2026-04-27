@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle del Libro | LibroAI</title>
+    <link rel="stylesheet" href="./styles.css">
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .d-container { max-width: 1000px; margin: 40px auto; padding: 20px; display: grid; grid-template-columns: 320px 1fr; gap: 40px; }
+        .d-sidebar img { width: 100%; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+        .d-meta { display: flex; flex-direction: column; gap: 20px; }
+        .d-title { font-size: 3rem; font-weight: 800; line-height: 1.1; margin: 0; }
+        .d-subtitle { font-size: 1.5rem; color: #94a3b8; font-weight: 500; }
+        .d-author-box { display: flex; align-items: center; gap: 15px; margin-top: 10px; padding: 15px; background: rgba(255,255,255,0.03); border-radius: 12px; }
+        .d-avatar { width: 50px; height: 50px; border-radius: 50%; background: #6366f1; object-fit: cover; }
+        .d-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .badge-cat { background: #6366f1; }
+        .badge-lang { background: #1e293b; border: 1px solid #334155; }
+        .d-desc { line-height: 1.8; color: #cbd5e1; font-size: 1.1rem; }
+        .d-actions { display: flex; gap: 15px; margin-top: 20px; }
+        .d-stats { display: flex; gap: 30px; border-top: 1px solid #1e293b; border-bottom: 1px solid #1e293b; padding: 20px 0; margin-top: 20px; }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-val { font-weight: 800; font-size: 1.2rem; }
+        .stat-label { font-size: 12px; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="d-container">
+        <aside class="d-sidebar">
+            <img id="bookCover" src="" alt="Portada">
+            <div class="d-actions">
+                <button id="readFullBtn" class="btn btn-primary" style="flex: 1;">Leer Completo</button>
+                <button id="readSampleBtn" class="btn btn-secondary">Leer Muestra</button>
+            </div>
+        </aside>
+        <main class="d-meta">
+            <h1 id="bookTitle" class="d-title">Cargando...</h1>
+            <div id="bookSubtitle" class="d-subtitle"></div>
+            
+            <div class="d-author-box">
+                <img id="authorAvatar" class="d-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=LibroAI">
+                <div>
+                    <div id="authorName" style="font-weight: 700;">Autor</div>
+                    <div id="authorBio" style="font-size: 12px; color: #94a3b8;">Biografía corta...</div>
+                </div>
+            </div>
+
+            <div class="d-badges" id="bookBadges"></div>
+
+            <div class="d-stats">
+                <div class="stat-item"><span class="stat-val" id="statRating">⭐ -</span><span class="stat-label">Rating</span></div>
+                <div class="stat-item"><span class="stat-val" id="statWords">-</span><span class="stat-label">Palabras</span></div>
+                <div class="stat-item"><span class="stat-val" id="statTime">- min</span><span class="stat-label">Lectura</span></div>
+            </div>
+
+            <div class="d-desc" id="bookDesc"></div>
+
+            <div id="bookTags" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+        </main>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const slug = urlParams.get("slug");
+
+        async function loadDetail() {
+            try {
+                const res = await fetch(`/api/marketplace/book/${slug}`);
+                const book = await res.json();
+                
+                document.getElementById("bookTitle").textContent = book.title;
+                document.getElementById("bookSubtitle").textContent = book.subtitle || "";
+                document.getElementById("bookDesc").textContent = book.description;
+                document.getElementById("bookCover").src = book.cover_url;
+                document.getElementById("authorName").textContent = book.author_name || book.author_email;
+                
+                document.getElementById("statRating").textContent = book.avg_rating ? "⭐ " + Number(book.avg_rating).toFixed(1) : "Nuevo";
+                document.getElementById("statWords").textContent = (book.word_count || 0).toLocaleString();
+                document.getElementById("statTime").textContent = (book.reading_time_minutes || 0) + " min";
+
+                const badges = document.getElementById("bookBadges");
+                badges.innerHTML = `<span class="badge badge-cat">${book.category || 'General'}</span><span class="badge badge-lang">${book.language || 'es'}</span>`;
+
+                const readFullBtn = document.getElementById("readFullBtn");
+                
+                // Determinar estado de compra (esto requiere un pequeño check extra o confiar en el backend)
+                // Por ahora el backend nos dirá si ya lo tenemos si intentamos leer.
+                // Pero para la UI, hagamos un check rápido:
+                const rLib = await fetch("/api/marketplace/library");
+                const library = await rLib.json();
+                const isOwned = library.some(b => b.id === book.id);
+
+                if (isOwned || book.price === 0) {
+                    readFullBtn.textContent = "Leer ahora";
+                    readFullBtn.onclick = () => window.location.href = `/libroia/reader.html?id=${book.id}`;
+                } else {
+                    readFullBtn.textContent = `Comprar por $${book.price}`;
+                    readFullBtn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
+                    readFullBtn.onclick = async () => {
+                        readFullBtn.disabled = true;
+                        readFullBtn.textContent = "Procesando...";
+                        try {
+                            const pRes = await fetch("/api/payments/create-checkout-session", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ book_id: book.id })
+                            });
+                            const pData = await pRes.json();
+                            if (pData.url) window.location.href = pData.url;
+                            else alert(pData.error);
+                        } catch (e) {
+                            alert("Error al iniciar compra");
+                        } finally {
+                            readFullBtn.disabled = false;
+                            readFullBtn.textContent = `Comprar por $${book.price}`;
+                        }
+                    };
+                }
+
+                document.getElementById("readSampleBtn").onclick = () => window.location.href = `/libroia/reader.html?id=${book.id}&sample=true`;
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        loadDetail();
+    </script>
+</body>
+</html>

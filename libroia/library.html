@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Panel | LibroAI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/landing.css">
+    <style>
+        :root {
+            --sidebar-width: 280px;
+        }
+
+        body {
+            background-color: var(--bg-black);
+            color: var(--text-white);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #0f0f0f;
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            padding: 40px 20px;
+            z-index: 10;
+        }
+
+        .sidebar-logo {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 50px;
+            padding-left: 15px;
+        }
+
+        .sidebar-logo span { color: var(--accent-ocre); }
+
+        .nav-menu {
+            list-style: none;
+            flex: 1;
+        }
+
+        .nav-item {
+            margin-bottom: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 14px 20px;
+            color: var(--text-grey);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 4px;
+            transition: 0.3s;
+        }
+
+        .nav-link i {
+            width: 20px;
+            font-size: 16px;
+            color: var(--accent-ocre);
+            opacity: 0.7;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: rgba(150, 113, 23, 0.1);
+            color: var(--text-white);
+        }
+
+        .nav-link.active i {
+            opacity: 1;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 30px;
+        }
+
+        .btn-writer {
+            width: 100%;
+            background: linear-gradient(45deg, var(--accent-wine), var(--accent-wine-light));
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.3s;
+        }
+
+        .btn-writer:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(91, 28, 35, 0.3);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 60px 8%;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .page-header {
+            margin-bottom: 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .page-header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 42px;
+            margin-bottom: 10px;
+        }
+
+        .page-header p {
+            color: var(--text-grey);
+            font-size: 14px;
+        }
+
+        /* Book Grid */
+        .lib-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 30px;
+        }
+
+        .book-card {
+            background: #151515;
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            overflow: hidden;
+            transition: 0.4s;
+        }
+
+        .book-card:hover {
+            border-color: var(--accent-ocre);
+            transform: translateY(-5px);
+        }
+
+        .book-cover {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .book-info {
+            padding: 20px;
+        }
+
+        .book-info h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .book-info p {
+            font-size: 12px;
+            color: var(--text-grey);
+            margin-bottom: 15px;
+        }
+
+        .progress-container {
+            margin-bottom: 15px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #222;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-ocre);
+            transition: 0.5s;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-grey);
+            margin-top: 5px;
+            text-transform: uppercase;
+        }
+
+        .btn-read {
+            display: inline-block;
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-white);
+            text-align: center;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .btn-read:hover {
+            background: var(--text-white);
+            color: var(--bg-black);
+        }
+
+        /* Generic Section Placeholder */
+        .section-placeholder {
+            text-align: center;
+            padding: 100px 0;
+            color: var(--text-grey);
+        }
+
+        .section-placeholder i {
+            font-size: 64px;
+            margin-bottom: 25px;
+            opacity: 0.2;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-subtle); padding: 20px; }
+            .nav-menu { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-logo">LIBRO<span>AI</span></div>
+        
+        <nav class="nav-menu">
+            <div class="nav-item">
+                <a href="#" class="nav-link" onclick="showSection('pedidos')">
+                    <i class="fa-solid fa-receipt"></i> Mis Pedidos
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#" class="nav-link active" onclick="showSection('comprados')">
+                    <i class="fa-solid fa-book"></i> Libros Comprados
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#" class="nav-link" onclick="showSection('wallet')">
+                    <i class="fa-solid fa-wallet"></i> Wallet
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#" class="nav-link" onclick="showSection('invitar')">
+                    <i class="fa-solid fa-user-plus"></i> Invitar Amigo
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#" class="nav-link" onclick="showSection('compartir')">
+                    <i class="fa-solid fa-share-nodes"></i> Compartir
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="btn-writer" onclick="window.location.href='/vender'">
+                <i class="fa-solid fa-feather"></i> Hazte Escritor
+            </button>
+            <a href="/" style="display: block; text-align: center; color: var(--text-grey); font-size: 11px; margin-top: 20px; text-decoration: none;">
+                Volver a la Galería
+            </a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <!-- Purchased Books Section -->
+        <section id="section-comprados">
+            <div class="page-header">
+                <div>
+                    <h1>Mis Tesoros</h1>
+                    <p>La colección privada de tus obras adquiridas.</p>
+                </div>
+            </div>
+
+            <div id="libraryGrid" class="lib-grid">
+                <!-- Loading... -->
+            </div>
+        </section>
+
+        <!-- Other Sections (Placeholders) -->
+        <section id="section-pedidos" style="display: none;">
+            <div class="page-header"><h1>Mis Pedidos</h1></div>
+            <div class="section-placeholder">
+                <i class="fa-solid fa-receipt"></i>
+                <p>Aún no tienes facturas registradas.</p>
+            </div>
+        </section>
+
+        <section id="section-wallet" style="display: none;">
+            <div class="page-header"><h1>Wallet</h1></div>
+            <div class="section-placeholder">
+                <i class="fa-solid fa-wallet"></i>
+                <p>Tu balance actual es $0.00</p>
+            </div>
+        </section>
+
+        <section id="section-invitar" style="display: none;">
+            <div class="page-header"><h1>Invitar Amigo</h1></div>
+            <div class="section-placeholder">
+                <i class="fa-solid fa-user-plus"></i>
+                <p>Invita a otros amantes de la lectura y gana créditos.</p>
+            </div>
+        </section>
+
+        <section id="section-compartir" style="display: none;">
+            <div class="page-header"><h1>Compartir</h1></div>
+            <div class="section-placeholder">
+                <i class="fa-solid fa-share-nodes"></i>
+                <p>Comparte tu pasión por la literatura.</p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        function showSection(id) {
+            // Hide all
+            document.querySelectorAll('main section').forEach(s => s.style.display = 'none');
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            
+            // Show target
+            document.getElementById('section-' + id).style.display = 'block';
+            event.currentTarget.classList.add('active');
+        }
+
+        async function loadLibrary() {
+            const grid = document.getElementById("libraryGrid");
+            try {
+                const res = await fetch("/api/buyer/library");
+                const books = await res.json();
+
+                if (books.length === 0) {
+                    grid.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; padding: 100px 0; color: var(--text-grey);">
+                            <i class="fa-solid fa-book-open" style="font-size: 48px; opacity: 0.1; margin-bottom: 20px;"></i>
+                            <h2 style="font-family: Cormorant Garamond;">Tu estantería está vacía</h2>
+                            <p style="font-size: 14px;">Explora el marketplace para añadir obras a tu colección.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                grid.innerHTML = books.map(b => `
+                    <div class="book-card">
+                        <img src="${b.cover_url || 'https://via.placeholder.com/400x600?text=Obra+Maestra'}" class="book-cover">
+                        <div class="book-info">
+                            <h3>${b.title}</h3>
+                            <p>${b.author_name || 'Anónimo'}</p>
+                            
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${b.progress || 0}%"></div>
+                                </div>
+                                <div class="progress-label">
+                                    <span>Progreso</span>
+                                    <span>${Math.round(b.progress || 0)}%</span>
+                                </div>
+                            </div>
+                            
+                            <a href="/libroia/reader.html?book_id=${b.id}" class="btn-read">
+                                ${b.progress > 0 ? "Continuar" : "Abrir Libro"}
+                            </a>
+                        </div>
+                    </div>
+                `).join("");
+            } catch (err) {
+                grid.innerHTML = "<p>No se pudo conectar con la biblioteca.</p>";
+            }
+        }
+        
+        loadLibrary();
+    </script>
+</body>
+</html>

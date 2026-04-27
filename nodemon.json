@@ -1,0 +1,18 @@
+{
+  "watch": [
+    "server.js",
+    "app.js",
+    "index.html",
+    "styles.css",
+    ".env",
+    "routes",
+    "lib",
+    "middleware"
+  ],
+  "ignore": ["node_modules/**", "data/**", "*.db"],
+  "ext": "js,json,html,css,env",
+  "delay": 300,
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

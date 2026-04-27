@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LibroAI — Editor de libros con IA</title>
+    <meta name="description" content="LibroAI: editor de libros asistido por inteligencia artificial. Escribe, organiza y mejora tus capítulos con Claude AI." />
+    <meta name="theme-color" content="#0f172a" />
+    <meta property="og:title" content="LibroAI — Editor de libros con IA" />
+    <meta property="og:description" content="Tu escritorio para escribir libros con IA. Organiza capítulos, mejora tu prosa y exporta tu obra." />
+    <meta property="og:type" content="website" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Playfair+Display:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <link rel="stylesheet" href="/libroia/styles.css" />
+  </head>
+  <body>
+    <div id="loginOverlay" class="login-overlay" hidden>
+      <div class="login-overlay__glow" aria-hidden="true"></div>
+      <div class="login-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <header class="login-modal__brand">
+          <div class="login-modal__logo" aria-hidden="true">L</div>
+          <div class="login-modal__brand-text">
+            <span class="login-modal__name">LibroAI</span>
+            <span class="login-modal__tagline">Tu escritorio para libros con IA</span>
+          </div>
+        </header>
+        <div class="login-modal__body">
+          <div class="auth-tabs" role="tablist" aria-label="Tipo de acceso">
+            <button type="button" class="auth-tab active" id="authTabLogin" aria-selected="true">Entrar</button>
+            <button type="button" class="auth-tab" id="authTabRegister" aria-selected="false">Crear cuenta</button>
+          </div>
+          <h2 class="login-modal__title" id="authTitle">Entrar</h2>
+          <p id="loginBanner" class="login-modal__hint">
+            Plan Free: 50k tokens de prueba · Plan PRO: 3M tokens + Sonnet PRO
+          </p>
+          <div id="loginErrorMsg" class="login-modal__error" hidden></div>
+          <div id="googleSignInWrap" class="google-signin-wrap">
+            <button type="button" id="googleSignInBtn" class="auth-btn-google">
+              <svg class="auth-btn-google__icon" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6C45.56 39.2 48 32.59 48 25c0-0.17-.01-0.33-.02-0.45z" />
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.02 0 24c0 3.98.92 7.53 2.56 10.78l7.97-6.19z" />
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                <path fill="none" d="M0 0h48v48H0z" />
+              </svg>
+              Continuar con Google
+            </button>
+            <p class="google-signin-wrap__note muted small">
+              Cuenta de Google segura; no compartimos tu contraseña.
+            </p>
+          </div>
+          <div class="auth-divider" id="emailAuthDivider" role="separator">
+            <span>o con correo electrónico</span>
+          </div>
+          <form id="authForm" class="auth-form">
+            <div>
+              <label class="auth-label" for="authEmail">Correo electrónico</label>
+              <input class="auth-input" id="authEmail" type="email" required autocomplete="email" placeholder="nombre@ejemplo.com" />
+            </div>
+            <div>
+              <label class="auth-label" for="authPassword">Contraseña</label>
+              <input class="auth-input" id="authPassword" type="password" required minlength="8" autocomplete="current-password" placeholder="Mínimo 8 caracteres" />
+            </div>
+            <div id="authPassword2Wrap" class="auth-password2-wrap" hidden>
+              <div>
+                <label class="auth-label" for="authPassword2">Confirmar contraseña</label>
+                <input class="auth-input" id="authPassword2" type="password" minlength="8" autocomplete="new-password" placeholder="Repite la contraseña" />
+              </div>
+            </div>
+            <button type="submit" class="auth-btn" id="authSubmitBtn">Entrar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="onboardingOverlay" class="login-overlay" hidden>
+      <div class="login-overlay__glow" aria-hidden="true"></div>
+      <div class="onboarding-modal login-modal" role="dialog" aria-modal="true">
+        <header class="login-modal__brand">
+          <div class="login-modal__logo" aria-hidden="true">L</div>
+          <div class="login-modal__brand-text">
+            <span class="login-modal__name">LibroAI</span>
+          </div>
+        </header>
+
+        <div class="login-modal__body">
+          <!-- Paso 0: Elección -->
+          <div id="obStep0" class="ob-step">
+            <h2 class="login-modal__title">¿Qué vamos a crear hoy?</h2>
+            <div class="ob-choices">
+              <button class="btn-ob-choice" type="button" id="obNewBookBtn">
+                <span class="ob-icon"><i class="fa-solid fa-plus"></i></span>
+                <span class="ob-text">Nuevo Libro</span>
+              </button>
+              <button class="btn-ob-choice" type="button" id="obOpenBookBtn">
+                <span class="ob-icon"><i class="fa-solid fa-book-open"></i></span>
+                <span class="ob-text">Abrir Proyecto</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Paso: Seleccionar Libro Existente -->
+          <div id="obStepOpen" class="ob-step" hidden>
+            <h2 class="login-modal__title">Selecciona un proyecto</h2>
+            <div id="obBookSelectorList" class="ob-book-selector">
+              <!-- Se llena dinámicamente -->
+            </div>
+            <div class="ob-nav">
+              <button type="button" class="btn btn-secondary ob-back">Atrás</button>
+            </div>
+          </div>
+
+          <!-- Paso 1: Título -->
+          <div id="obStep1" class="ob-step" hidden>
+            <h2 class="login-modal__title">¡Excelente! ¿Cómo se va a llamar tu libro?</h2>
+            <input type="text" id="obBookTitle" class="auth-input" placeholder="Ej: El misterio de la montaña..." />
+            <div class="ob-nav">
+              <button type="button" class="btn btn-secondary ob-back">Atrás</button>
+              <button type="button" class="btn btn-primary ob-next">Siguiente</button>
+            </div>
+          </div>
+
+          <!-- Paso 2: Género -->
+          <div id="obStep2" class="ob-step" hidden>
+            <h2 class="login-modal__title">¿Qué género vamos a escribir hoy?</h2>
+            <div class="ob-genres">
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Ciencia ficción" /> Ciencia ficción</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Romance" /> Romance</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Terror" /> Terror</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Fantasía" /> Fantasía</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Misterio" /> Misterio</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Religioso" /> Religioso</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="De la vida real" /> De la vida real</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Novela" /> Novela</label>
+              <label class="genre-pill"><input type="radio" name="obGenre" value="Otro" id="genreOtroRadio" /> Otro...</label>
+            </div>
+            <input type="text" id="obGenreOther" class="auth-input" placeholder="Escribe tu género..." hidden />
+            <div class="ob-nav">
+              <button type="button" class="btn btn-secondary ob-back">Atrás</button>
+              <button type="button" class="btn btn-primary ob-next">Siguiente</button>
+            </div>
+          </div>
+
+          <!-- Paso 3: Autor -->
+          <div id="obStep3" class="ob-step" hidden>
+            <h2 class="login-modal__title">¿Y quién es el autor de esta obra?</h2>
+            <input type="text" id="obAuthorName" class="auth-input" placeholder="Tu nombre o seudónimo..." />
+            <div class="ob-nav">
+              <button type="button" class="btn btn-secondary ob-back">Atrás</button>
+              <button type="button" class="btn btn-primary" id="obFinishBtn">¡Empecemos!</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand">LIBRO<span>AI</span> EDITOR</div>
+        <div class="status" id="statusText">Escritorio</div>
+      </div>
+      <div class="topbar-right">
+        <div id="usageTracker" class="usage-tracker" title="Consumo acumulado del mes">
+          <span id="trackerPlan">FREE</span>: <span id="trackerValue">0</span>
+        </div>
+        <a href="/dashboard" class="btn-icon-link" title="Mi Biblioteca">
+          <i class="fa-solid fa-book"></i>
+        </a>
+        <div class="user-profile-mini">
+          <img id="topbarAvatar" src="https://ui-avatars.com/api/?name=U&background=641220&color=fff" alt="User">
+          <button class="btn-logout-mini" id="logoutBtn" title="Cerrar Sesión">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+        <button class="btn-header-primary" id="saveBtn"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+        <button class="btn-header-accent" id="publishBtn"><i class="fa-solid fa-upload"></i> Publicar</button>
+      </div>
+    </header>
+
+    <main class="app-grid">
+      <aside class="library-pane">
+        <div class="library-header">
+          <h3>Biblioteca</h3>
+        </div>
+
+        <div id="usagePanel" class="usage-panel" hidden>
+          <div class="usage-header-row">
+            <div class="usage-title">Plan <span id="planNameBadge" style="text-transform: uppercase; font-weight: bold;"></span></div>
+            <button id="upgradeBtn" class="btn btn-primary btn-small" style="background: linear-gradient(135deg, #6366f1, #a855f7);" hidden>Hacerse PRO</button>
+          </div>
+          <div id="usageSummary" class="usage-summary muted"></div>
+          <div class="usage-bar-outer">
+            <div id="usageBar" class="usage-bar-inner"></div>
+          </div>
+          <div id="usageAlert" class="usage-alert" hidden></div>
+        </div>
+
+        <div class="book-meta">
+          <label>Titulo del libro</label>
+          <input id="bookTitleInput" type="text" />
+          <label>Genero</label>
+          <input id="bookGenreInput" type="text" />
+          <label>Autor</label>
+          <input id="bookAuthorInput" type="text" />
+          <label>Sinopsis</label>
+          <textarea id="bookSynopsisInput" rows="3" placeholder="Idea general del libro..."></textarea>
+          
+          <label>Portada (Imagen)</label>
+          <div class="meta-upload-row">
+            <input type="file" id="bookCoverFile" accept="image/*" style="display:none" />
+            <button id="triggerCoverUpload" class="btn btn-secondary btn-small">Seleccionar Imagen</button>
+            <span id="coverUploadStatus" class="muted small">Sin archivo</span>
+          </div>
+          <div id="bookCoverPreview" class="book-cover-preview" hidden>
+            <img id="coverImg" src="" alt="Portada" />
+            <button id="removeCoverBtn" class="btn-remove">×</button>
+          </div>
+
+          <button id="saveBookMetaBtn" class="btn btn-secondary">Guardar datos del libro</button>
+          <div class="meta-actions">
+            <button id="previewBtn" class="btn btn-secondary" style="background: #1e293b; color: #fff;">👁️ Vista Impresión</button>
+            <button id="exportBtn" class="btn btn-secondary">Exportar .md</button>
+          </div>
+        </div>
+        <div id="bookList" class="book-list"></div>
+      </aside>
+
+      <section class="editor-pane">
+        <div class="pane-header">
+          <div class="title-row">
+            <input id="chapterTitle" class="chapter-title" placeholder="Titulo del capitulo" />
+            <div class="editor-toolbar">
+              <button class="tool-btn" onclick="insertFormat('bold')" title="Negrita"><b>B</b></button>
+              <button class="tool-btn" onclick="insertFormat('italic')" title="Itálica"><i>I</i></button>
+              <button class="tool-btn" onclick="insertFormat('underline')" title="Subrayar"><u>U</u></button>
+              <button class="tool-btn" onclick="insertFormat('formatBlock', 'h3')" title="Título">H</button>
+            </div>
+          </div>
+          
+          <!-- Nueva Barra de Herramientas AI -->
+          <div class="ai-toolbar">
+            <button id="aiReviseChapterBtn" class="btn btn-secondary btn-small" title="Mejorar gramática, estilo y ritmo de este capítulo">✨ Revisar Capítulo</button>
+            <button id="aiOrganizeBtn" class="btn btn-secondary btn-small" title="Detectar capítulos, ordenar y renumerar">🪄 Organizar Manuscrito</button>
+            <button id="aiReviseBookBtn" class="btn btn-secondary btn-small" title="Revisar todo el libro (chunks)">📚 Revisar Libro</button>
+            <button id="viewVersionsBtn" class="btn btn-secondary btn-small">🕒 Historial</button>
+          </div>
+
+          <div id="chapterNav" class="chapter-nav"></div>
+          <button id="viewAllBtn" class="btn btn-secondary btn-small" title="Ver el libro completo">📚 Todo</button>
+          <button id="wipeChaptersBtn" class="btn btn-secondary btn-small" style="color: #ef4444;" title="Borrar todos los capítulos (mantiene el texto)">🗑️ Limpiar Estructura</button>
+          <button id="magicSplitBtn" class="btn btn-secondary btn-small" title="Identificar capítulos en el texto y separar">🪄 Organizar (Rápido)</button>
+        </div>
+
+        <!-- Modal de Revisión / Diff -->
+        <div id="revisionOverlay" class="login-overlay" hidden>
+          <div class="login-modal" style="max-width: 900px; width: 95%;">
+            <header class="login-modal__brand">
+              <div class="login-modal__brand-text"><span class="login-modal__name">Revisión Editorial</span></div>
+            </header>
+            <div class="login-modal__body">
+              <p class="muted small">Compara la versión original con la propuesta por la IA:</p>
+              <div class="revision-compare">
+                <div class="rev-side">
+                  <strong>Original</strong>
+                  <div id="revOriginal" class="rev-box"></div>
+                </div>
+                <div class="rev-side">
+                  <strong>Propuesta</strong>
+                  <div id="revProposed" class="rev-box"></div>
+                </div>
+              </div>
+              <div class="ob-nav" style="margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" id="revCancelBtn">Descartar</button>
+                <button type="button" class="btn btn-primary" id="revApplyBtn">Aplicar Cambios</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="editor" class="editor-area" contenteditable="true"></div>
+      </section>
+
+      <aside class="chat-pane">
+
+
+        <div id="chatMessages" class="chat-messages"></div>
+
+        <div class="chat-controls-footer">
+          <div class="model-tabs" role="group" aria-label="Modelo">
+            <label class="model-tab">
+              <input type="radio" name="aiTier" value="included" checked />
+              Automático
+            </label>
+            <label class="model-tab">
+              <input type="radio" name="aiTier" value="sonnet" />
+              Sonnet PRO
+            </label>
+          </div>
+
+          <div id="sonnetCostPreview" class="sonnet-cost-preview" hidden></div>
+
+            <div class="chat-actions-row">
+              <select id="requestType" class="request-type">
+                <option value="auto" selected>Auto (Inteligente)</option>
+                <option value="chapter">Capítulo (Escribir)</option>
+                <option value="ideas">Ideas / Consultas</option>
+                <option value="outline">Esquema / Estructura</option>
+                <option value="rewrite">Reescritura</option>
+                <option value="summary">Resumen</option>
+              </select>
+              <button id="continueBtn" class="btn btn-secondary btn-small">Continuar escribiendo</button>
+            </div>
+
+          <div id="sonnetBillingPanel" class="sonnet-billing-panel" hidden>
+            <div class="billing-form-inline">
+              <label class="inline-check"><input type="checkbox" id="sonnetPaygToggle" /> Pago activo</label>
+              <input id="sonnetSpendLimit" type="number" min="0" step="1" placeholder="Limite $" />
+              <button type="button" class="btn btn-primary btn-small" id="saveSonnetBillingBtn">OK</button>
+            </div>
+            <div id="sonnetSpendSummary" class="muted small"></div>
+          </div>
+        </div>
+
+        <form id="chatForm" class="chat-input-row">
+          <input
+            id="chatInput"
+            type="text"
+            placeholder="Ej: mejora este parrafo con mas tension..."
+            autocomplete="off"
+          />
+          <button type="submit" class="btn btn-primary">Enviar</button>
+        </form>
+      </aside>
+    </main>
+
+    <script type="module">
+      // ── Cargar config Firebase desde el servidor ────────────────────────────
+      // Las credenciales viven en .env, NO en el código fuente.
+      let firebaseConfig = {};
+      try {
+        const cfgRes = await fetch("/api/config/firebase");
+        if (cfgRes.ok) firebaseConfig = await cfgRes.json();
+      } catch (e) {
+        console.error("[LibroAI] No se pudo cargar la config de Firebase:", e);
+      }
+
+      // ── Imports dinámicos (compatibles con top-level await) ─────────────────
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js");
+      const { getAnalytics } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-analytics.js");
+      const { getAuth, signInWithPopup, GoogleAuthProvider } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js");
+      const { getFirestore, collection, getDocs, addDoc, updateDoc, doc, setDoc, query, where } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js");
+
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // Exponer globalmente para que app.js pueda usarlos
+      window.firebaseAuth = auth;
+      window.firebaseSignInWithPopup = signInWithPopup;
+      window.firebaseGoogleProvider = new GoogleAuthProvider();
+      window.firebaseDb = db;
+      window.fb = { collection, getDocs, addDoc, updateDoc, doc, setDoc, query, where };
+    </script>
+
+    <div id="previewOverlay" class="preview-overlay" hidden>
+      <div class="preview-controls">
+        <button id="closePreviewBtn" class="btn btn-secondary">← Volver a Editar</button>
+        <button id="printBtn" class="btn btn-primary">🖨️ Imprimir / PDF</button>
+      </div>
+      <div id="previewContent" class="preview-content">
+        <!-- Las páginas se generarán aquí -->
+      </div>
+    </div>
+    <!-- marked.js: renderizado de Markdown completo en el chat de IA -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+    <script src="/libroia/app.js" type="module"></script>
+  </body>
+</html>

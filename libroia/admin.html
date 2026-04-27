@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Maestro | LibroAI</title>
+    <link rel="stylesheet" href="/libroia/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { background: #07090e; color: white; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 280px; background: #0f172a; padding: 40px 25px; border-right: 1px solid rgba(255,255,255,0.05); }
+        .nav-link { display: flex; align-items: center; gap: 15px; padding: 15px; color: #64748b; text-decoration: none; border-radius: 12px; margin-bottom: 12px; transition: 0.3s; }
+        .nav-link.active, .nav-link:hover { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .main-content { flex: 1; padding: 60px; overflow-y: auto; }
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 50px; }
+        .stat-card { background: #0f172a; padding: 30px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); }
+        .val { font-size: 32px; font-weight: 800; margin: 10px 0; }
+        .label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; }
+        
+        .section-card { background: #0f172a; border-radius: 24px; padding: 35px; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px; color: #64748b; font-size: 12px; }
+        td { padding: 15px; border-top: 1px solid rgba(255,255,255,0.05); }
+        
+        .btn-action { padding: 8px 15px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; }
+        .btn-approve { background: #10b981; color: white; }
+        .btn-reject { background: #f43f5e; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div style="font-size: 22px; font-weight: 800; margin-bottom: 60px; color: #10b981;">MASTER ADMIN</div>
+        <nav>
+            <a href="#" class="nav-link active"><i class="fa-solid fa-gauge"></i> Dashboard</a>
+            <a href="#" class="nav-link"><i class="fa-solid fa-users"></i> Usuarios</a>
+            <a href="#" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payouts</a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <header style="margin-bottom: 40px;">
+            <h1>Plataforma Maestro</h1>
+            <p style="color: #64748b;">Control total de LibroAI.</p>
+        </header>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="label">Comisiones Netas</div>
+                <div id="netFees" class="val" style="color: #10b981;">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Payouts Pendientes</div>
+                <div id="pendingPayouts" class="val" style="color: #fbbf24;">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Sellers Pendientes</div>
+                <div id="pendingSellersCount" class="val">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Ventas Totales</div>
+                <div id="grossSales" class="val">$0.00</div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h3>Vendedores Pendientes de Aprobación</h3>
+            <table id="pendingSellersTable">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Nombre</th>
+                        <th>Método Pago</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="section-card">
+            <h3>Solicitudes de Payout</h3>
+            <table id="payoutsTable">
+                <thead>
+                    <tr>
+                        <th>Vendedor</th>
+                        <th>Monto</th>
+                        <th>Método</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function loadAdmin() {
+            const res = await fetch("/api/admin/dashboard");
+            const data = await res.json();
+            
+            document.getElementById("netFees").textContent = `$${(data.stats.sales.net / 100).toFixed(2)}`;
+            document.getElementById("pendingPayouts").textContent = `$${(data.stats.pending_payouts / 100).toFixed(2)}`;
+            document.getElementById("pendingSellersCount").textContent = data.stats.pending_sellers;
+            document.getElementById("grossSales").textContent = `$${(data.stats.sales.gross / 100).toFixed(2)}`;
+
+            // Sellers
+            const sellersRes = await fetch("/api/admin/sellers/pending");
+            const sellers = await sellersRes.json();
+            const sTable = document.getElementById("pendingSellersTable").querySelector("tbody");
+            sTable.innerHTML = sellers.map(s => `
+                <tr>
+                    <td>${s.email}</td>
+                    <td>${s.display_name}</td>
+                    <td>${s.payout_method} (${s.payout_email})</td>
+                    <td>
+                        <button class="btn-action btn-approve" onclick="approveSeller(${s.id})">Aprobar</button>
+                        <button class="btn-action btn-reject" onclick="rejectSeller(${s.id})">Rechazar</button>
+                    </td>
+                </tr>
+            `).join("");
+
+            // Payouts
+            const payoutsRes = await fetch("/api/admin/payouts");
+            const payouts = await payoutsRes.json();
+            const pTable = document.getElementById("payoutsTable").querySelector("tbody");
+            pTable.innerHTML = payouts.filter(p => p.status === 'pending').map(p => `
+                <tr>
+                    <td>${p.seller_email}</td>
+                    <td>$${(p.amount / 100).toFixed(2)}</td>
+                    <td>${p.payout_method} (${p.payout_email})</td>
+                    <td>
+                        <button class="btn-action btn-approve" onclick="markPaid(${p.id})">Marcar Pagado</button>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        window.approveSeller = async (id) => {
+            await fetch(`/api/admin/sellers/${id}/approve`, { method: 'POST' });
+            loadAdmin();
+        };
+        window.rejectSeller = async (id) => {
+            await fetch(`/api/admin/sellers/${id}/reject`, { method: 'POST' });
+            loadAdmin();
+        };
+        window.markPaid = async (id) => {
+            await fetch(`/api/admin/payouts/${id}/mark-paid`, { method: 'POST' });
+            loadAdmin();
+        };
+
+        loadAdmin();
+    </script>
+</body>
+</html>

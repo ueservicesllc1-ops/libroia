@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Publicaciones | LibroAI</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .p-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
+        .p-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .p-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .p-row { background: #1e293b; border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .p-info { flex: 1; }
+        .p-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 4px; }
+        .p-meta { font-size: 12px; color: #94a3b8; }
+        .p-stats { display: flex; gap: 20px; text-align: center; }
+        .stat-box { display: flex; flex-direction: column; min-width: 80px; }
+        .stat-val { font-weight: 800; font-size: 1.1rem; color: #6366f1; }
+        .stat-label { font-size: 10px; text-transform: uppercase; color: #64748b; }
+        .p-actions { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+    <div class="p-container">
+        <header class="p-header">
+            <h1>Panel del Autor</h1>
+            <div style="display: flex; gap: 10px;">
+                <a href="/libroia/sales.html" class="btn btn-primary">💰 Ver Ventas</a>
+                <a href="/libroia/app.html" class="btn btn-secondary">Volver al Editor</a>
+            </div>
+        </header>
+
+        <div id="publishedList" class="p-grid">
+            <!-- Cargando... -->
+        </div>
+    </div>
+
+    <script>
+        async function loadPublished() {
+            try {
+                const res = await fetch("/api/marketplace/dashboard/published");
+                const books = await res.json();
+                const list = document.getElementById("publishedList");
+                list.innerHTML = "";
+
+                if (books.length === 0) {
+                    list.innerHTML = "<p>No tienes libros publicados todavía.</p>";
+                    return;
+                }
+
+                books.forEach(book => {
+                    const row = document.createElement("div");
+                    row.className = "p-row";
+                    row.innerHTML = `
+                        <div class="p-info">
+                            <div class="p-title">${book.title}</div>
+                            <div class="p-meta">Publicado el ${new Date(book.created_at).toLocaleDateString()} • ${book.word_count} palabras</div>
+                        </div>
+                        <div class="p-stats">
+                            <div class="stat-box"><span class="stat-val">${book.views}</span><span class="stat-label">Vistas</span></div>
+                            <div class="stat-box"><span class="stat-val">${book.reads}</span><span class="stat-label">Lecturas</span></div>
+                            <div class="stat-box"><span class="stat-val">${book.avg_rating ? book.avg_rating.toFixed(1) : "-"}</span><span class="stat-label">Rating</span></div>
+                        </div>
+                        <div class="p-actions">
+                            <a href="/libroia/marketplace-detail.html?slug=${book.slug}" class="btn btn-secondary btn-small">Ver ficha</a>
+                            <button class="btn btn-primary btn-small">Editar</button>
+                        </div>
+                    `;
+                    list.appendChild(row);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        loadPublished();
+    </script>
+</body>
+</html>
