@@ -5,7 +5,7 @@ const { requireAuth, getUserId } = require("../middleware/requireAuth");
 
 /**
  * POST /api/seller/apply
- * Usuario solicita ser vendedor
+ * Usuario solicita ser vendedor - Aprobación Automática e Inmediata
  */
 router.post("/apply", requireAuth, (req, res) => {
   try {
@@ -15,26 +15,39 @@ router.post("/apply", requireAuth, (req, res) => {
 
     const now = new Date().toISOString();
     
-    // Crear o actualizar perfil
-    db.prepare(`
-      INSERT INTO seller_profiles (user_id, display_name, bio, payout_method, payout_email, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET
-        display_name=excluded.display_name,
-        bio=excluded.bio,
-        payout_method=excluded.payout_method,
-        payout_email=excluded.payout_email,
-        status='pending',
-        updated_at=excluded.updated_at
-    `).run(uid, display_name, bio, payout_method, payout_email, now, now);
+    db.transaction(() => {
+      // 1. Crear o actualizar perfil con estado 'approved'
+      db.prepare(`
+        INSERT INTO seller_profiles (user_id, display_name, bio, payout_method, payout_email, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'approved', ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          display_name=excluded.display_name,
+          bio=excluded.bio,
+          payout_method=excluded.payout_method,
+          payout_email=excluded.payout_email,
+          status='approved',
+          updated_at=excluded.updated_at
+      `).run(uid, display_name, bio, payout_method, payout_email, now, now);
 
-    // Inicializar balance si no existe
-    db.prepare(`
-      INSERT OR IGNORE INTO seller_balances (seller_id, updated_at)
-      VALUES (?, ?)
-    `).run(uid, now);
+      // 2. Actualizar el rol del usuario a is_seller = 1 inmediatamente
+      db.prepare(`UPDATE users SET is_seller = 1 WHERE id = ?`).run(uid);
 
-    res.json({ success: true, message: "Solicitud enviada correctamente. Estamos revisando tu perfil." });
+      // 3. Inicializar balance si no existe
+      db.prepare(`
+        INSERT OR IGNORE INTO seller_balances (seller_id, updated_at)
+        VALUES (?, ?)
+      `).run(uid, now);
+
+      // 4. Actualizar la sesión si es necesario (el middleware requireAuth vuelve a cargar los datos)
+      if (req.session.user) {
+        req.session.user.is_seller = 1;
+      }
+    })();
+
+    res.json({ 
+      success: true, 
+      message: "¡Felicidades! Ya eres escritor oficial de LibroAI. Bienvenido a bordo." 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

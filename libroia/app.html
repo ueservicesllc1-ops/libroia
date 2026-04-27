@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <link rel="stylesheet" href="/libroia/styles.css" />
   </head>
-  <body>
+  <body class="is-loading">
     <div id="loginOverlay" class="login-overlay" hidden>
       <div class="login-overlay__glow" aria-hidden="true"></div>
       <div class="login-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
@@ -192,7 +192,7 @@
         <div id="usagePanel" class="usage-panel" hidden>
           <div class="usage-header-row">
             <div class="usage-title">Plan <span id="planNameBadge" style="text-transform: uppercase; font-weight: bold;"></span></div>
-            <button id="upgradeBtn" class="btn btn-primary btn-small" style="background: linear-gradient(135deg, #6366f1, #a855f7);" hidden>Hacerse PRO</button>
+            <button id="upgradeBtn" class="btn btn-primary btn-small" style="background: linear-gradient(135deg, #6366f1, #a855f7);" hidden>⚡ Hazte PRO</button>
           </div>
           <div id="usageSummary" class="usage-summary muted"></div>
           <div class="usage-bar-outer">
@@ -377,6 +377,55 @@
         <!-- Las páginas se generarán aquí -->
       </div>
     </div>
+    <!-- Modal Planes PRO -->
+    <div id="plansModal" class="plans-overlay" hidden>
+      <div class="plans-modal">
+        <button class="plans-close" id="plansCloseBtn" title="Cerrar">&times;</button>
+        <div class="plans-header">
+          <div class="plans-logo">L</div>
+          <h2 class="plans-title">Elige tu plan</h2>
+          <p class="plans-subtitle">Escribe más. Publica más. Llega lejos.</p>
+        </div>
+        <div class="plans-grid">
+          <!-- FREE -->
+          <div class="plan-card plan-free">
+            <div class="plan-name">Free</div>
+            <div class="plan-price">$0<span>/mes</span></div>
+            <ul class="plan-features">
+              <li class="feat-ok">✍️ Editor de libros con IA</li>
+              <li class="feat-ok">💬 Chat con IA integrado</li>
+              <li class="feat-ok">1 proyecto activo</li>
+              <li class="feat-ok">50,000 tokens/mes</li>
+              <li class="feat-no">✗ Sin revisión ni corrección IA</li>
+              <li class="feat-no">✗ Sin publicar en Marketplace</li>
+              <li class="feat-no">✗ Sin exportar en PDF</li>
+              <li class="feat-no">✗ Sin generación de portadas</li>
+            </ul>
+            <div class="plan-cta plan-cta-free">Tu plan actual</div>
+          </div>
+          <!-- PRO -->
+          <div class="plan-card plan-pro">
+            <div class="plan-badge">✦ RECOMENDADO</div>
+            <div class="plan-name">PRO</div>
+            <div class="plan-price">$9.99<span>/mes</span></div>
+            <div class="plan-price" style="margin-top:6px;font-size:1.05rem;color:#c9980a;">$95.90<span>/año (ahorras 20%)</span></div>
+            <ul class="plan-features">
+              <li class="feat-ok">✍️ Editor de libros con IA</li>
+              <li class="feat-ok">💬 Chat con IA integrado</li>
+              <li class="feat-ok">📚 Proyectos ilimitados</li>
+              <li class="feat-ok">🚀 3,000,000 tokens/mes</li>
+              <li class="feat-ok">✨ Revisión y corrección con IA</li>
+              <li class="feat-ok">🌐 Publicar en el Marketplace</li>
+              <li class="feat-ok">📄 Exportar en PDF y más formatos</li>
+              <li class="feat-ok">🎨 Generación de portadas</li>
+            </ul>
+            <button id="payProMonthlyBtn" class="plan-cta plan-cta-pro">💳 Pagar mensual</button>
+            <button id="payProYearlyBtn" class="plan-cta plan-cta-pro" style="margin-top:10px;background:linear-gradient(135deg,#967117,#c9980a);">💳 Pagar anual (20% OFF)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- marked.js: renderizado de Markdown completo en el chat de IA -->
     <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
     <script src="/libroia/app.js" type="module"></script>

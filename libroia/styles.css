@@ -12,9 +12,193 @@
   box-sizing: border-box;
 }
 
+/* Estado de carga para evitar parpadeo */
+body.is-loading .topbar,
+body.is-loading .app-grid {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Evita que reglas como `display: flex` anulen el atributo HTML `hidden`. */
 [hidden] {
   display: none !important;
+}
+
+/* ── Modal de Planes PRO ────────────────────────────────────────────────── */
+.plans-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(6px);
+}
+
+.plans-modal {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  padding: 40px 36px 36px;
+  animation: modalEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+}
+
+.plans-close {
+  position: absolute;
+  top: 16px; right: 20px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s;
+}
+.plans-close:hover { color: #fff; }
+
+.plans-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.plans-logo {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: #5b1c23;
+  border: 1px solid #967117;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; font-weight: 800;
+  color: #967117;
+  font-family: 'Cormorant Garamond', serif;
+  margin: 0 auto 16px;
+}
+
+.plans-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem; font-weight: 700;
+  color: #fff; margin: 0 0 8px;
+}
+
+.plans-subtitle {
+  color: #64748b; margin: 0;
+  font-size: 0.9rem;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.plan-card {
+  border-radius: 4px;
+  padding: 28px 24px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: #1a1a1a;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-pro {
+  border-color: rgba(150, 113, 23, 0.5);
+  background: linear-gradient(145deg, #1a1a1a, #1c1508);
+  box-shadow: 0 0 40px rgba(150, 113, 23, 0.1);
+}
+
+.plan-badge {
+  position: absolute;
+  top: -12px; left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #967117, #c9980a);
+  color: #000;
+  font-size: 10px; font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 4px 14px;
+  border-radius: 999px;
+}
+
+.plan-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.plan-pro .plan-name { color: #c9980a; }
+
+.plan-price {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.plan-price span {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.plan-features {
+  list-style: none;
+  padding: 0; margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.plan-features li {
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.feat-ok { color: #e2e8f0; }
+.feat-no { color: #475569; text-decoration: line-through; }
+
+.plan-cta {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: none;
+  font-family: inherit;
+}
+
+.plan-cta-free {
+  background: rgba(255,255,255,0.05);
+  color: #64748b;
+  cursor: default;
+}
+
+.plan-cta-pro {
+  background: linear-gradient(135deg, #967117, #c9980a);
+  color: #000;
+  font-size: 15px;
+}
+
+.plan-cta-pro:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(150, 113, 23, 0.4);
+}
+
+@media (max-width: 600px) {
+  .plans-grid { grid-template-columns: 1fr; }
 }
 
 /* Onboarding */

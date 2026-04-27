@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require("../lib/billing/db");
 const prompts = require("../lib/prompts");
 const { callAnthropicMessages } = require("../lib/anthropicClient");
+const { requireAuth, requirePlan } = require("../middleware/requireAuth");
 
 const ensureAuth = (req, res, next) => {
   if (!req.session.userId && !process.env.SKIP_AUTH) {
@@ -12,19 +13,20 @@ const ensureAuth = (req, res, next) => {
 };
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
-const model = "claude-3-5-sonnet-20240620";
+// Usamos el modelo configurado en .env, no uno hardcodeado
+const getModel = () => process.env.ANTHROPIC_REFINE_MODEL || "claude-sonnet-4-5-20250929";
 
 /**
- * POST /api/ai/revise-chapter
+ * POST /api/ai/revise-chapter  [PRO]
  */
-router.post("/revise-chapter", ensureAuth, async (req, res) => {
+router.post("/revise-chapter", ensureAuth, requirePlan("pro"), async (req, res) => {
   try {
     const { content, book_id } = req.body;
     if (!content) return res.status(400).json({ error: "Contenido vacío" });
 
     const out = await callAnthropicMessages({
       apiKey,
-      model,
+      model: getModel(),
       system: "Eres un editor literario experto. Devuelve solo el texto corregido.",
       userText: prompts.reviseChapterPrompt(content),
       maxTokens: 4000,
@@ -48,16 +50,16 @@ router.post("/revise-chapter", ensureAuth, async (req, res) => {
 });
 
 /**
- * POST /api/ai/organize-manuscript
+ * POST /api/ai/organize-manuscript  [PRO]
  */
-router.post("/organize-manuscript", ensureAuth, async (req, res) => {
+router.post("/organize-manuscript", ensureAuth, requirePlan("pro"), async (req, res) => {
   try {
     const { content, book_id } = req.body;
     if (!content) return res.status(400).json({ error: "Contenido vacío" });
 
     const out = await callAnthropicMessages({
       apiKey,
-      model,
+      model: getModel(),
       system: "Eres un arquitecto editorial. Devuelve solo un JSON válido.",
       userText: prompts.organizeManuscriptPrompt(content),
       maxTokens: 8000,
@@ -67,7 +69,13 @@ router.post("/organize-manuscript", ensureAuth, async (req, res) => {
     let resultText = out.text;
     resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
     
-    const structured = JSON.parse(resultText);
+    let structured;
+    try {
+      structured = JSON.parse(resultText);
+    } catch (parseErr) {
+      console.error("[organize-manuscript] JSON parse error:", parseErr.message);
+      return res.status(502).json({ error: "La IA no devolvió un formato válido. Intenta de nuevo." });
+    }
 
     const db = getDb();
     db.prepare(`

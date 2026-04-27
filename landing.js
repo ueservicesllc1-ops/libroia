@@ -1,4 +1,5 @@
-let currentAuthMode = 'login';
+let currentUser = null;
+let redirectAfterLogin = null;
 
 async function checkSession() {
     try {
@@ -6,8 +7,10 @@ async function checkSession() {
         const data = await res.json();
         
         if (data && data.user) {
+            currentUser = data.user;
             updateUI(data.user);
         } else {
+            currentUser = null;
             document.getElementById('authBtns').style.display = 'flex';
             document.getElementById('userMenu').style.display = 'none';
         }
@@ -16,7 +19,22 @@ async function checkSession() {
     }
 }
 
+function handleStartWriting() {
+    if (!currentUser) {
+        // No está logueado -> Guardamos intención y abrimos login
+        redirectAfterLogin = '/vender';
+        openLoginModal();
+    } else if (currentUser.is_seller || currentUser.is_admin) {
+        // Ya es escritor -> Al escritorio
+        window.location.href = '/escribir';
+    } else {
+        // Logueado pero no es escritor -> Al formulario de venta
+        window.location.href = '/vender';
+    }
+}
+
 function updateUI(user) {
+    // ... (keep existing updateUI logic)
     document.getElementById('authBtns').style.display = 'none';
     const userMenu = document.getElementById('userMenu');
     userMenu.style.display = 'flex';
@@ -45,6 +63,7 @@ function openLoginModal() {
 function closeLoginModal() {
     document.getElementById('loginModal').style.display = 'none';
     document.body.style.overflow = 'auto';
+    redirectAfterLogin = null; // Limpiar si cierra sin loguear
 }
 
 function setAuthMode(mode) {
@@ -85,7 +104,11 @@ async function handleGoogleLogin() {
         });
         
         if (res.ok) {
-            window.location.reload();
+            if (redirectAfterLogin) {
+                window.location.href = redirectAfterLogin;
+            } else {
+                window.location.reload();
+            }
         } else {
             const data = await res.json();
             errorDiv.textContent = data.error || "Error al verificar con el servidor";
@@ -119,7 +142,11 @@ document.getElementById('landingAuthForm').addEventListener('submit', async (e) 
         const data = await res.json();
         
         if (res.ok) {
-            window.location.reload();
+            if (redirectAfterLogin) {
+                window.location.href = redirectAfterLogin;
+            } else {
+                window.location.reload();
+            }
         } else {
             errorDiv.textContent = data.error || "Error en la autenticación";
         }

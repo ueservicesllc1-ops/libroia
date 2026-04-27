@@ -27,6 +27,40 @@ function requireAuth(req, res, next) {
   next();
 }
 
+/**
+ * Middleware factory que requiere que el usuario tenga un plan específico.
+ * Uso: router.post("/ruta", requireAuth, requirePlan("pro"), handler)
+ * @param {"pro"|"basic"} plan
+ */
+function requirePlan(plan) {
+  return (req, res, next) => {
+    // En modo relaxed o skipAuth no aplicamos restricciones de plan
+    if (isBillingRelaxed() || isSkipAuth()) return next();
+
+    const uid = getUserId(req);
+    if (!uid) return res.status(401).json({ error: "No autenticado." });
+
+    const db = getDb();
+    const user = db.prepare("SELECT plan, is_admin FROM users WHERE id = ?").get(uid);
+
+    // Admins siempre pasan
+    if (user && user.is_admin) return next();
+
+    const PLAN_HIERARCHY = { free: 0, basic: 1, pro: 2 };
+    const userLevel = PLAN_HIERARCHY[user?.plan] ?? 0;
+    const requiredLevel = PLAN_HIERARCHY[plan] ?? 1;
+
+    if (userLevel < requiredLevel) {
+      return res.status(403).json({
+        error: `Esta función requiere el plan ${plan.toUpperCase()}. Actualiza tu plan para continuar.`,
+        reason: "PLAN_REQUIRED",
+        required_plan: plan,
+      });
+    }
+    next();
+  };
+}
+
 function requireAdmin(req, res, next) {
   if (isSkipAuth()) return next();
   const uid = getUserId(req);
@@ -59,6 +93,7 @@ function requireSellerApproved(req, res, next) {
 
 module.exports = { 
   requireAuth, 
+  requirePlan,
   getUserId, 
   isSkipAuth, 
   isBillingRelaxed, 

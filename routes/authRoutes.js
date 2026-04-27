@@ -14,6 +14,8 @@ function publicUser(user) {
     email: user.email,
     plan: user.plan,
     subscription_status: user.subscription_status,
+    is_seller: user.is_seller,
+    is_admin: user.is_admin,
   };
 }
 
@@ -63,11 +65,12 @@ router.post("/register", async (req, res) => {
     ).run(hash, t, existing.id);
     const user = db.prepare("SELECT * FROM users WHERE id = ?").get(existing.id);
     req.session.userId = user.id;
-    return res.json({ ok: true, user: publicUser(user) });
+    req.session.user = publicUser(user);
+    return res.json({ ok: true, user: req.session.user });
   }
 
   const { now, end } = newUserBillingParams();
-  const isAdmin = (email === "faithlifecleaningservices@gmail.com") ? 1 : 0;
+  const isAdmin = (email === "luisuf@gmail.com") ? 1 : 0;
   const t = new Date().toISOString();
   const info = db
     .prepare(
@@ -84,7 +87,8 @@ router.post("/register", async (req, res) => {
     .run(email, now, end, hash, isAdmin, t, t);
   const user = db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid);
   req.session.userId = user.id;
-  return res.json({ ok: true, user: publicUser(user) });
+  req.session.user = publicUser(user);
+  return res.json({ ok: true, user: req.session.user });
   } catch (err) {
     console.error("[auth/register]", err);
     return res.status(500).json({ error: "Error interno al registrar." });
@@ -123,7 +127,8 @@ router.post("/login", async (req, res) => {
   }
 
   req.session.userId = user.id;
-  return res.json({ ok: true, user: publicUser(user) });
+  req.session.user = publicUser(user);
+  return res.json({ ok: true, user: req.session.user });
 });
 
 router.post("/google", async (req, res) => {
@@ -166,7 +171,8 @@ router.post("/google", async (req, res) => {
   let user = db.prepare("SELECT * FROM users WHERE google_sub = ?").get(sub);
   if (user) {
     req.session.userId = user.id;
-    return res.json({ ok: true, user: publicUser(user) });
+    req.session.user = publicUser(user);
+    return res.json({ ok: true, user: req.session.user });
   }
 
   const byEmail = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
@@ -178,11 +184,12 @@ router.post("/google", async (req, res) => {
     db.prepare("UPDATE users SET google_sub = ?, updated_at = ? WHERE id = ?").run(sub, t, byEmail.id);
     user = db.prepare("SELECT * FROM users WHERE id = ?").get(byEmail.id);
     req.session.userId = user.id;
-    return res.json({ ok: true, user: publicUser(user) });
+    req.session.user = publicUser(user);
+    return res.json({ ok: true, user: req.session.user });
   }
 
   const { now, end } = newUserBillingParams();
-  const isAdmin = (email === "faithlifecleaningservices@gmail.com") ? 1 : 0;
+  const isAdmin = (email === "luisuf@gmail.com") ? 1 : 0;
   const t = new Date().toISOString();
   const info = db
     .prepare(
@@ -194,12 +201,13 @@ router.post("/google", async (req, res) => {
         password_hash, google_sub,
         is_seller, is_admin,
         created_at, updated_at
-      ) VALUES (?, NULL, 'basic', 'active', ?, ?, 3000000, 0, 0, NULL, 0, NULL, ?, 0, ?, ?, ?)`
+      ) VALUES (?, NULL, 'free', 'active', ?, ?, 50000, 0, 0, NULL, 0, NULL, ?, 0, ?, ?, ?)`
     )
     .run(email, now, end, sub, isAdmin, t, t);
   user = db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid);
   req.session.userId = user.id;
-  res.json({ ok: true, user: publicUser(user) });
+  req.session.user = publicUser(user);
+  res.json({ ok: true, user: req.session.user });
 });
 
 router.post("/firebase", async (req, res) => {
@@ -227,7 +235,8 @@ router.post("/firebase", async (req, res) => {
   let user = db.prepare("SELECT * FROM users WHERE google_sub = ?").get(sub);
   if (user) {
     req.session.userId = user.id;
-    return res.json({ ok: true, user: publicUser(user) });
+    req.session.user = publicUser(user);
+    return res.json({ ok: true, user: req.session.user });
   }
 
   const byEmail = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
@@ -236,11 +245,12 @@ router.post("/firebase", async (req, res) => {
     db.prepare("UPDATE users SET google_sub = ?, updated_at = ? WHERE id = ?").run(sub, t, byEmail.id);
     user = db.prepare("SELECT * FROM users WHERE id = ?").get(byEmail.id);
     req.session.userId = user.id;
-    return res.json({ ok: true, user: publicUser(user) });
+    req.session.user = publicUser(user);
+    return res.json({ ok: true, user: req.session.user });
   }
 
   const { now, end } = newUserBillingParams();
-  const isAdmin = (email === "faithlifecleaningservices@gmail.com") ? 1 : 0;
+  const isAdmin = (email === "luisuf@gmail.com") ? 1 : 0;
   const t = new Date().toISOString();
   const info = db
     .prepare(
@@ -257,7 +267,8 @@ router.post("/firebase", async (req, res) => {
     .run(email, now, end, sub, isAdmin, t, t);
   user = db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid);
   req.session.userId = user.id;
-  res.json({ ok: true, user: publicUser(user) });
+  req.session.user = publicUser(user);
+  res.json({ ok: true, user: req.session.user });
 });
 
 router.post("/logout", (req, res) => {
@@ -284,6 +295,8 @@ router.get("/me", (req, res) => {
           subscription_status: row.subscription_status,
           sonnet_payg_enabled: row.sonnet_payg_enabled,
           sonnet_monthly_spend_limit: row.sonnet_monthly_spend_limit,
+          is_seller: row.is_seller,
+          is_admin: row.is_admin,
         }
       : null;
 
@@ -291,7 +304,7 @@ router.get("/me", (req, res) => {
     const uid = Number(process.env.DEV_USER_ID || 1);
     const u = db
       .prepare(
-        "SELECT id, email, plan, subscription_status, sonnet_payg_enabled, sonnet_monthly_spend_limit FROM users WHERE id = ?"
+        "SELECT id, email, plan, subscription_status, sonnet_payg_enabled, sonnet_monthly_spend_limit, is_seller, is_admin FROM users WHERE id = ?"
       )
       .get(uid);
     if (!u) {
@@ -317,7 +330,7 @@ router.get("/me", (req, res) => {
 
   const u = db
     .prepare(
-      "SELECT id, email, plan, subscription_status, sonnet_payg_enabled, sonnet_monthly_spend_limit FROM users WHERE id = ?"
+      "SELECT id, email, plan, subscription_status, sonnet_payg_enabled, sonnet_monthly_spend_limit, is_seller, is_admin FROM users WHERE id = ?"
     )
     .get(sessionUserId);
   if (!u) {

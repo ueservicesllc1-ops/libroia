@@ -37,24 +37,6 @@ app.use(helmet({
   crossOriginOpenerPolicy: false,
 }));
 
-app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
-  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
-  if (DEV) {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  }
-  const p = req.originalUrl.split("?")[0];
-  if (p.startsWith("/api")) {
-    res.setHeader("X-LibroAI", "1");
-  }
-  next();
-});
-
-// Webhook de Stripe (Raw Body)
-app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), paymentRoutes);
-
-app.use(express.json({ limit: "2mb" }));
-
 app.use(
   session({
     name: SESSION_NAME,
@@ -69,6 +51,28 @@ app.use(
     },
   })
 );
+
+// Webhook de Stripe (Raw Body)
+app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), paymentRoutes);
+
+app.use(express.json({ limit: "2mb" }));
+
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+  if (DEV) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  }
+  const p = req.originalUrl.split("?")[0];
+  if (p.startsWith("/api")) {
+    res.setHeader("X-LibroAI", "1");
+  }
+  // Log de depuración para rutas críticas
+  if (p === "/libroia" || p === "/dashboard" || p === "/escribir") {
+    console.log(`[DEBUG] Request: ${p}, SessionID: ${req.sessionID}, userId: ${req.session?.userId}`);
+  }
+  next();
+});
 
 // ── Rutas API ─────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
@@ -104,26 +108,32 @@ app.get("/api/config/firebase", (req, res) => {
   });
 });
 
-app.use(express.static(__dirname));
-app.use("/libroia", express.static(path.join(__dirname, "libroia")));
-
-// Rutas Amigables (HTML)
+// Rutas Amigables (HTML) - Colocar ANTES de express.static para que los manejadores tengan prioridad
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
-app.get("/libroia", (req, res) => {
-  if (!req.session.user) return res.redirect("/");
-  if (!req.session.user.is_seller && !req.session.user.is_admin) return res.redirect("/dashboard");
+app.get("/escribir", (req, res) => {
+  const uid = req.session.userId;
+  if (!uid) return res.redirect("/");
+  
+  const { getDb } = require("./lib/billing/db");
+  const db = getDb();
+  const user = db.prepare("SELECT is_seller, is_admin FROM users WHERE id = ?").get(uid);
+  
+  if (!user || (!user.is_seller && !user.is_admin)) {
+    return res.redirect("/dashboard");
+  }
   res.sendFile(path.join(__dirname, "libroia", "app.html"));
 });
 
-app.get("/libroia/", (req, res) => res.redirect("/libroia"));
+app.get("/libroia", (req, res) => res.redirect("/escribir"));
+app.get("/libroia/", (req, res) => res.redirect("/escribir"));
 app.get("/dashboard", (req, res) => res.sendFile(path.join(__dirname, "libroia", "library.html")));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "libroia", "admin.html")));
 app.get("/library", (req, res) => res.redirect("/dashboard"));
 app.get("/vender", (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-apply.html")));
 app.get("/vender-dashboard", (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-dashboard.html")));
 
-// Servir estáticos
+app.use(express.static(__dirname));
 app.use("/libroia", express.static(path.join(__dirname, "libroia")));
 app.use("/data/media", express.static(path.join(__dirname, "data", "media")));
 

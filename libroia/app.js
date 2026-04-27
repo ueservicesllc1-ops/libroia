@@ -94,6 +94,7 @@ let selectedBookId = null;
 let selectedChapterId = null;
 let lastSuggestion = "";
 let currentUserId = null;
+let currentUser = null;  // objeto completo del usuario (incluye plan, is_admin, etc)
 let hasUnsavedChanges = false;
 
 // ─── REVISIÓN EDITORIAL CON IA ──────────────────────────────────────────
@@ -104,8 +105,18 @@ const revApplyBtn = document.getElementById("revApplyBtn");
 const revCancelBtn = document.getElementById("revCancelBtn");
 let currentRevisionData = null;
 
-// Botón: Revisar Capítulo
+// Helper: muestra el modal de planes si el usuario no tiene plan PRO
+function requireProUI() {
+  if (currentUser && (currentUser.plan === 'pro' || currentUser.is_admin)) return true;
+  // Abrir modal de planes
+  const plansModal = document.getElementById('plansModal');
+  if (plansModal) plansModal.hidden = false;
+  return false;
+}
+
+// Botón: Revisar Capítulo [PRO]
 document.getElementById("aiReviseChapterBtn")?.addEventListener("click", async () => {
+  if (!requireProUI()) return;
   const content = editor.innerHTML;
   if (!content || content.length < 50) return alert("Escribe un poco más para poder revisar.");
   setStatus("✨ Revisando capítulo...");
@@ -128,8 +139,9 @@ document.getElementById("aiReviseChapterBtn")?.addEventListener("click", async (
   }
 });
 
-// Botón: Organizar Manuscrito
+// Botón: Organizar Manuscrito [PRO]
 document.getElementById("aiOrganizeBtn")?.addEventListener("click", async () => {
+  if (!requireProUI()) return;
   const content = editor.innerHTML;
   setStatus("🪄 Organizando manuscrito...");
   try {
@@ -222,6 +234,7 @@ async function finishOnboarding() {
   const book = await createBook(title, genre, author);
   if (book) {
     onboardingOverlay.hidden = true;
+    document.body.classList.remove('is-loading');
     // Saludo inicial de la IA
     const greeting = `¡Hola ${author || "escritor"}! 📝 Ya tengo todo listo para que empecemos con **"${title}"**. Veo que es una obra de **${genre || "género por definir"}**. ¿Por dónde te gustaría empezar? Puedo ayudarte con el esquema, ideas para el primer capítulo o lo que necesites.`;
     addMessage("ai", greeting);
@@ -551,6 +564,25 @@ async function refreshUsagePanel() {
   }
   try {
     const u = await api("/api/billing/usage");
+
+    // PRO: solo mostrar badge limpio, sin panel de tokens
+    if (u.plan === "pro" || u.plan === "basic") {
+      usagePanel.hidden = false;
+      if (planNameBadge) planNameBadge.textContent = "PRO ✦";
+      if (upgradeBtn) upgradeBtn.hidden = true;
+      // Ocultar barra y resumen de tokens
+      usageSummary.textContent = "Acceso ilimitado a todas las funciones.";
+      usageBar.style.width = "100%";
+      usageBar.classList.remove("usage-bar-warn", "usage-bar-danger");
+      usageBar.style.background = "linear-gradient(90deg, #967117, #c9980a)";
+      usageAlert.hidden = true;
+      // Tracker superior: ocultar para PRO
+      const usageTrackerEl = document.getElementById("usageTracker");
+      if (usageTrackerEl) usageTrackerEl.style.display = "none";
+      return;
+    }
+
+    // FREE: mostrar todo el panel de uso normal
     usagePanel.hidden = false;
     if (planNameBadge) planNameBadge.textContent = u.plan || "Free";
     if (upgradeBtn) {
@@ -564,6 +596,7 @@ async function refreshUsagePanel() {
       "es-ES"
     )} tokens (${rem.toLocaleString("es-ES")} libres).`;
     usageBar.style.width = `${pct}%`;
+    usageBar.style.background = "";
 
     // Sincronizar tracker superior
     if (trackerPlan) trackerPlan.textContent = u.plan || "Free";
@@ -634,6 +667,7 @@ async function loadData() {
       return;
     }
     currentUserId = me.id;
+    currentUser = me;  // guardar objeto completo para verificar plan
     loginOverlay.hidden = true;
   } else {
     currentUserId = 1; // Default for skipAuth
@@ -1027,6 +1061,7 @@ obOpenBookBtn.addEventListener("click", () => {
         selectedBookId = book.id;
         selectedChapterId = book.chapters[0]?.id || null;
         onboardingOverlay.hidden = true;
+        document.body.classList.remove('is-loading');
         syncEditorFromSelection();
         renderBooks();
         addMessage("ai", `¡Excelente elección! 👋 He cargado **"${book.title}"**. ¿Qué te gustaría trabajar ahora?`);
@@ -1269,7 +1304,54 @@ function renderPreview() {
 }
 
 upgradeBtn.addEventListener("click", () => {
-  addMessage("ai", "### ¡Pásate a PRO! 🚀\n\nEl plan **PRO** incluye:\n- **3,000,000** de tokens mensuales para el modo Automático.\n- Acceso completo a **Sonnet PRO** (pago por uso).\n- Sincronización en la nube ilimitada.\n\n*Haz clic en el botón de pago en tu perfil para actualizar.*");
+  const plansModal = document.getElementById("plansModal");
+  if (plansModal) plansModal.hidden = false;
+});
+
+// Cerrar modal de planes
+document.getElementById("plansCloseBtn")?.addEventListener("click", () => {
+  document.getElementById("plansModal").hidden = true;
+});
+document.getElementById("plansModal")?.addEventListener("click", (e) => {
+  if (e.target === document.getElementById("plansModal")) {
+    document.getElementById("plansModal").hidden = true;
+  }
+});
+
+// Pagar PRO con Stripe (mensual o anual)
+async function startProCheckout(interval, btnId, loadingLabel) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.textContent = "Redirigiendo...";
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/payments/create-subscription-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ interval }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert(data.error || "Error al iniciar el pago");
+      btn.textContent = loadingLabel;
+      btn.disabled = false;
+    }
+  } catch (err) {
+    alert("Error de conexión");
+    btn.textContent = loadingLabel;
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("payProMonthlyBtn")?.addEventListener("click", async () => {
+  await startProCheckout("month", "payProMonthlyBtn", "💳 Pagar mensual");
+});
+
+document.getElementById("payProYearlyBtn")?.addEventListener("click", async () => {
+  await startProCheckout("year", "payProYearlyBtn", "💳 Pagar anual (20% OFF)");
 });
 
 

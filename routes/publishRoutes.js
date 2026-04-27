@@ -4,6 +4,7 @@ const { getDb } = require("../lib/billing/db");
 const { uploadToB2 } = require("../lib/storageService");
 const { getFirebaseAdmin } = require("../lib/firebaseAdmin");
 const DOMPurify = require("isomorphic-dompurify");
+const { requirePlan } = require("../middleware/requireAuth");
 
 // Helper para slugs
 const slugify = (text) => {
@@ -23,10 +24,10 @@ const estimateReadingTime = (text) => {
 };
 
 /**
- * POST /api/publish/:id/publish
+ * POST /api/publish/:id/publish  [PRO]
  * Publica un libro con calidad profesional
  */
-router.post("/:id/publish", async (req, res) => {
+router.post("/:id/publish", requirePlan("pro"), async (req, res) => {
   try {
     const bookId = req.params.id;
     const userId = req.session.userId || 1;
@@ -82,33 +83,39 @@ router.post("/:id/publish", async (req, res) => {
     db.transaction(() => {
       db.prepare(`
         INSERT INTO books_public (
-          id, author_id, title, subtitle, slug, description, 
-          category, language, tags, word_count, reading_time_minutes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, author_id, title, subtitle, slug, description,
+          cover_url, category, language, tags, word_count,
+          reading_time_minutes, is_published, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           title = excluded.title,
           subtitle = excluded.subtitle,
           slug = excluded.slug,
           description = excluded.description,
+          cover_url = excluded.cover_url,
           category = excluded.category,
           language = excluded.language,
           tags = excluded.tags,
           word_count = excluded.word_count,
-          reading_time_minutes = excluded.reading_time_minutes
+          reading_time_minutes = excluded.reading_time_minutes,
+          is_published = 1,
+          updated_at = excluded.updated_at
       `).run(
-        bookId, userId, bookData.title, subtitle || "", slug, 
-        bookData.synopsis || "Sin descripción", category || "General", 
-        language || "es", tags || "", wordCount, readingTime, now
+        bookId, userId, bookData.title, subtitle || "", slug,
+        bookData.synopsis || "Sin descripción", coverUrl,
+        category || "General", language || "es", tags || "",
+        wordCount, readingTime, now, now
       );
 
       db.prepare(`
-        INSERT INTO book_files (book_id, cover_url, pdf_url, sample_url)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO book_files (book_id, cover_url, pdf_url, sample_url, updated_at)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(book_id) DO UPDATE SET
           cover_url = excluded.cover_url,
           pdf_url = excluded.pdf_url,
-          sample_url = excluded.sample_url
-      `).run(bookId, coverUrl, mdUrl, sampleUrl);
+          sample_url = excluded.sample_url,
+          updated_at = excluded.updated_at
+      `).run(bookId, coverUrl, mdUrl, sampleUrl, now);
     })();
 
     res.json({ message: "Libro publicado con calidad profesional", slug });
