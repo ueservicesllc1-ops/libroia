@@ -7,6 +7,30 @@ const { requireAuth, getUserId } = require("../middleware/requireAuth");
  * GET /api/buyer/library
  * Libros comprados o gratuitos guardados
  */
+/**
+ * GET /api/buyer/physical-orders
+ * Pedidos de impresión/envío pagados con Stripe
+ */
+router.get("/physical-orders", requireAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const uid = getUserId(req);
+    const orders = db
+      .prepare(
+        `SELECT id, created_at, amount_total, shipping_cents, currency, status, shipping_json
+         FROM physical_orders WHERE user_id = ? ORDER BY id DESC`
+      )
+      .all(uid);
+    const linesStmt = db.prepare(
+      `SELECT book_id, title, amount_total, seller_amount
+       FROM physical_order_lines WHERE order_id = ?`
+    );
+    res.json(orders.map((o) => ({ ...o, lines: linesStmt.all(o.id) })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/library", requireAuth, (req, res) => {
   try {
     const db = getDb();

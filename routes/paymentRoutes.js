@@ -240,18 +240,129 @@ router.post("/create-cart-checkout-session", ensureAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/payments/create-physical-checkout-session
+ * Pedido físico: libros + envío único; Stripe recoge dirección de envío.
+ */
+router.post("/create-physical-checkout-session", ensureAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId || 1;
+    const db = getDb();
+    const ids = Array.isArray(req.body?.book_ids) ? req.body.book_ids : [];
+    const uniqueBookIds = [...new Set(ids.map((x) => String(x || "").trim()).filter(Boolean))];
+    if (!uniqueBookIds.length) {
+      return res.status(400).json({ error: "Selecciona al menos un libro físico." });
+    }
+
+    const shippingCents = Math.max(
+      0,
+      parseInt(process.env.PHYSICAL_SHIPPING_FLAT_CENTS || "999", 10)
+    );
+
+    const selectedBooks = [];
+    for (const bookId of uniqueBookIds) {
+      const book = db.prepare("SELECT * FROM books_public WHERE id = ?").get(bookId);
+      if (!book || !book.is_published || Number(book.price) <= 0) continue;
+      if (book.author_id === userId) continue;
+      selectedBooks.push(book);
+    }
+
+    if (!selectedBooks.length) {
+      return res.status(400).json({ error: "No hay libros válidos para pedido físico." });
+    }
+
+    const lineItems = [];
+    const cartItemsMeta = [];
+    for (const book of selectedBooks) {
+      const settlement = buildBookSettlement(book);
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: `${book.title} (edición impresa)`,
+            description: "Libro físico — Marketplace LibroAI",
+          },
+          unit_amount: settlement.amountTotal,
+        },
+        quantity: 1,
+      });
+      cartItemsMeta.push({
+        book_id: book.id,
+        seller_id: Number(book.author_id),
+        amount_total: settlement.amountTotal,
+        platform_fee: settlement.platformFee,
+        seller_amount: settlement.authorAmount,
+      });
+    }
+
+    lineItems.push({
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: "Envío impresión (un solo cargo por pedido)",
+          description: "Preparación y envío del pedido físico",
+        },
+        unit_amount: shippingCents,
+      },
+      quantity: 1,
+    });
+
+    const physicalCartRaw = JSON.stringify(cartItemsMeta);
+    if (physicalCartRaw.length > 500) {
+      return res.status(400).json({ error: "Pedido demasiado grande. Divide en dos compras." });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: lineItems,
+      shipping_address_collection: {
+        allowed_countries: [
+          "US", "MX", "ES", "CO", "AR", "CL", "PE", "EC", "GT", "CR", "PA", "DO", "PR",
+        ],
+      },
+      metadata: {
+        purchase_kind: "physical",
+        buyer_id: String(userId),
+        physical_cart: physicalCartRaw,
+        shipping_cents: String(shippingCents),
+      },
+      success_url: `${process.env.APP_BASE_URL}/libroia/payment-success.html?session_id={CHECKOUT_SESSION_ID}&kind=physical`,
+      cancel_url: `${process.env.APP_BASE_URL}/libroia/marketplace.html`,
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error("[Stripe] Physical Checkout Error:", error.message);
+    res.status(500).json({ error: "Error al crear el pedido físico." });
+  }
+});
+
+/**
  * GET /api/payments/session-status/:session_id
  */
 router.get("/session-status/:session_id", async (req, res) => {
   try {
     const db = getDb();
-    const purchases = db.prepare("SELECT status, book_id FROM purchases WHERE stripe_session_id = ?").all(req.params.session_id);
+    const sid = req.params.session_id;
+    const purchases = db.prepare("SELECT status, book_id FROM purchases WHERE stripe_session_id = ?").all(sid);
+    let paidBookIds = [];
+    let status = "pending";
     if (purchases && purchases.length) {
-      const paidBookIds = purchases.filter((p) => p.status === "paid").map((p) => p.book_id);
-      const status = paidBookIds.length ? "paid" : purchases[0].status;
-      return res.json({ status, paid_book_ids: paidBookIds });
+      paidBookIds = purchases.filter((p) => p.status === "paid").map((p) => p.book_id);
+      status = paidBookIds.length ? "paid" : purchases[0].status;
     }
-    res.json({ status: "pending", paid_book_ids: [] });
+
+    const physOrder = db.prepare("SELECT id FROM physical_orders WHERE stripe_session_id = ?").get(sid);
+    let physicalBookIds = [];
+    if (physOrder) {
+      physicalBookIds = db
+        .prepare("SELECT book_id FROM physical_order_lines WHERE order_id = ?")
+        .all(physOrder.id)
+        .map((r) => r.book_id);
+      if (physicalBookIds.length) status = "paid";
+    }
+
+    return res.json({ status, paid_book_ids: paidBookIds, physical_book_ids: physicalBookIds });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -305,7 +416,83 @@ router.post("/webhook", async (req, res) => {
       return res.json({ received: true });
     }
 
-    // ── Compra de libro ─────────────────────────────────────────────────
+    // ── Pedido físico (Stripe Checkout + envío) ─────────────────────────
+    if (meta && meta.purchase_kind === "physical" && meta.buyer_id && meta.physical_cart) {
+      try {
+        const buyerId = parseInt(meta.buyer_id, 10);
+        const cartItems = parseCartItems(meta.physical_cart);
+        const shippingCents = Math.max(0, parseInt(meta.shipping_cents || "0", 10));
+        if (!Number.isFinite(buyerId) || !cartItems || !cartItems.length) {
+          console.error("[Webhook] physical: metadata inválida", meta);
+          return res.json({ received: true, warning: "physical_metadata_invalid" });
+        }
+        const booksSum = cartItems.reduce((s, i) => s + i.amount_total, 0);
+        const expectedTotal = booksSum + shippingCents;
+        if (Number(session.amount_total) !== expectedTotal) {
+          console.error("[Webhook] physical: monto no coincide", session.amount_total, expectedTotal);
+          return res.json({ received: true, warning: "physical_amount_mismatch" });
+        }
+        const dup = db.prepare("SELECT id FROM physical_orders WHERE stripe_session_id = ?").get(session.id);
+        if (dup) return res.json({ received: true });
+
+        const shippingSnap =
+          session.shipping_details != null
+            ? JSON.stringify(session.shipping_details)
+            : JSON.stringify(session.customer_details || {});
+
+        db.transaction(() => {
+          const orderResult = db
+            .prepare(
+              `INSERT INTO physical_orders (
+              user_id, stripe_session_id, stripe_payment_intent_id,
+              amount_total, shipping_cents, currency, status, shipping_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+              buyerId,
+              session.id,
+              session.payment_intent || null,
+              Number(session.amount_total),
+              shippingCents,
+              session.currency || "usd",
+              "paid",
+              shippingSnap,
+              now
+            );
+          const orderId = orderResult.lastInsertRowid;
+          const lineIns = db.prepare(
+            `INSERT INTO physical_order_lines (
+            order_id, book_id, seller_id, title, amount_total, platform_fee_amount, seller_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          );
+          for (const item of cartItems) {
+            const book = db.prepare("SELECT title FROM books_public WHERE id = ?").get(item.book_id);
+            lineIns.run(
+              orderId,
+              item.book_id,
+              item.seller_id,
+              book?.title || "",
+              item.amount_total,
+              item.platform_fee,
+              item.seller_amount
+            );
+            db.prepare(
+              `UPDATE seller_balances
+             SET available_balance = available_balance + ?,
+                 lifetime_earnings = lifetime_earnings + ?,
+                 updated_at = ?
+             WHERE seller_id = ?`
+            ).run(item.seller_amount, item.seller_amount, now, item.seller_id);
+          }
+        })();
+        console.log(`[Webhook] pedido físico OK sesión ${session.id}`);
+      } catch (err) {
+        console.error("[Webhook] physical DB:", err.message);
+      }
+      return res.json({ received: true });
+    }
+
+    // ── Compra de libro (PDF / carrito digital) ─────────────────────────
     try {
       const buyer_id = parseInt(meta?.buyer_id);
       const cartItems = parseCartItems(meta?.cart_items);

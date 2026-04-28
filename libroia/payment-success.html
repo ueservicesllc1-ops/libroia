@@ -27,6 +27,7 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get("session_id");
+        const kind = (urlParams.get("kind") || "").toLowerCase();
 
         async function checkStatus() {
             try {
@@ -34,17 +35,20 @@
                 const data = await res.json();
 
                 if (data.status === "paid") {
-                    // Limpiar solo los PDFs realmente pagados en esta sesión.
                     try {
-                        const paidIds = Array.isArray(data.paid_book_ids) ? data.paid_book_ids.map(String) : [];
+                        const paidPdf = Array.isArray(data.paid_book_ids) ? data.paid_book_ids.map(String) : [];
+                        const paidPhys = Array.isArray(data.physical_book_ids) ? data.physical_book_ids.map(String) : [];
                         const CART_KEY = "libroai_marketplace_cart_v1";
                         const raw = localStorage.getItem(CART_KEY);
                         if (raw) {
                             const cart = JSON.parse(raw);
                             if (Array.isArray(cart)) {
                                 const next = cart.filter((item) => {
-                                    if ((item.format || "") !== "pdf") return true;
-                                    return !paidIds.includes(String(item.book_id));
+                                    const fmt = item.format || "";
+                                    const bid = String(item.book_id);
+                                    if (fmt === "pdf") return !paidPdf.includes(bid);
+                                    if (fmt === "physical") return !paidPhys.includes(bid);
+                                    return true;
                                 });
                                 localStorage.setItem(CART_KEY, JSON.stringify(next));
                             }
@@ -54,13 +58,22 @@
                     }
 
                     document.getElementById("statusIcon").textContent = "✅";
-                    document.getElementById("statusTitle").textContent = "¡Pago Confirmado!";
-                    document.getElementById("statusMsg").textContent = "Tu libro ya está disponible en tu biblioteca.";
+                    document.getElementById("statusTitle").textContent = "¡Pago confirmado!";
+                    const isPhysical = kind === "physical" || (data.physical_book_ids && data.physical_book_ids.length);
+                    document.getElementById("statusMsg").textContent = isPhysical
+                        ? "Tu pedido físico quedó registrado. Verás el detalle y la dirección en «Mis pedidos» del panel."
+                        : "Tu PDF ya está disponible en tu biblioteca (panel / dashboard).";
                     document.getElementById("loader").hidden = true;
                     document.getElementById("actions").hidden = false;
-                    document.getElementById("mainBtn").onclick = () => window.location.href = "/libroia/marketplace.html?tab=library";
+                    const btn = document.getElementById("mainBtn");
+                    if (isPhysical) {
+                        btn.textContent = "Ver mis pedidos";
+                        btn.onclick = () => { window.location.href = "/dashboard?section=pedidos"; };
+                    } else {
+                        btn.textContent = "Ir a mis libros";
+                        btn.onclick = () => { window.location.href = "/dashboard"; };
+                    }
                 } else {
-                    // Reintentar en 2 segundos
                     setTimeout(checkStatus, 2000);
                 }
             } catch (e) {

@@ -93,11 +93,17 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/seller", sellerRoutes);
 app.use("/api/buyer", buyerRoutes);
 
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
+});
+
 app.get("/api/config/public", (req, res) => {
+  const shipCents = Math.max(0, parseInt(process.env.PHYSICAL_SHIPPING_FLAT_CENTS || "999", 10));
   res.json({
     skipAuth: envBool("SKIP_AUTH"),
     billingRelaxed: envBool("BILLING_RELAXED"),
     googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+    physicalShippingCents: shipCents,
   });
 });
 

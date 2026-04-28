@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const { OAuth2Client } = require("google-auth-library");
 const { getDb } = require("../lib/billing/db");
@@ -7,6 +8,13 @@ const { getFirebaseAdmin } = require("../lib/firebaseAdmin");
 
 const router = express.Router();
 const BCRYPT_ROUNDS = 11;
+
+const loginRegisterLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 function publicUser(user) {
   return {
@@ -27,7 +35,7 @@ function newUserBillingParams() {
   return { now: iso(now), end: iso(end) };
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register", loginRegisterLimiter, async (req, res) => {
   if (isSkipAuth()) {
     return res.status(400).json({ error: "Registro desactivado en modo prueba (SKIP_AUTH)." });
   }
@@ -95,7 +103,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginRegisterLimiter, async (req, res) => {
   if (isSkipAuth()) {
     return res.status(400).json({ error: "Login desactivado en modo prueba (SKIP_AUTH)." });
   }

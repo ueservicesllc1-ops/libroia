@@ -281,27 +281,27 @@
 
         <nav class="nav-menu">
             <div class="nav-item">
-                <a href="#" class="nav-link" onclick="showSection('pedidos')">
-                    <i class="fa-solid fa-receipt"></i> Mis Pedidos
+                <a href="#" class="nav-link" onclick="showSection('pedidos', this)">
+                    <i class="fa-solid fa-receipt"></i> Mis pedidos (físico)
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link active" onclick="showSection('comprados')">
-                    <i class="fa-solid fa-book"></i> Libros Comprados
+                <a href="#" class="nav-link active" onclick="showSection('comprados', this)">
+                    <i class="fa-solid fa-book"></i> Libros comprados (PDF)
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link" onclick="showSection('wallet')">
+                <a href="#" class="nav-link" onclick="showSection('wallet', this)">
                     <i class="fa-solid fa-wallet"></i> Wallet
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link" onclick="showSection('invitar')">
+                <a href="#" class="nav-link" onclick="showSection('invitar', this)">
                     <i class="fa-solid fa-user-plus"></i> Invitar Amigo
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link" onclick="showSection('compartir')">
+                <a href="#" class="nav-link" onclick="showSection('compartir', this)">
                     <i class="fa-solid fa-share-nodes"></i> Compartir
                 </a>
             </div>
@@ -334,11 +334,13 @@
 
         <!-- Other Sections (Placeholders) -->
         <section id="section-pedidos" style="display: none;">
-            <div class="page-header"><h1>Mis Pedidos</h1></div>
-            <div class="section-placeholder">
-                <i class="fa-solid fa-receipt"></i>
-                <p>Aún no tienes facturas registradas.</p>
+            <div class="page-header">
+                <div>
+                    <h1>Mis pedidos físicos</h1>
+                    <p style="color: var(--text-grey); font-size: 14px;">Impresión y envío pagados con Stripe.</p>
+                </div>
             </div>
+            <div id="physicalOrdersList" class="lib-grid" style="grid-template-columns: 1fr;"></div>
         </section>
 
         <section id="section-wallet" style="display: none;">
@@ -367,14 +369,13 @@
     </main>
 
     <script>
-        function showSection(id) {
-            // Hide all
+        function showSection(id, el) {
             document.querySelectorAll('main section').forEach(s => s.style.display = 'none');
             document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            
-            // Show target
             document.getElementById('section-' + id).style.display = 'block';
-            event.currentTarget.classList.add('active');
+            const link = el || (typeof event !== 'undefined' ? event.currentTarget : null);
+            if (link) link.classList.add('active');
+            if (id === 'pedidos') loadPhysicalOrders();
         }
 
         async function checkUserStatus() {
@@ -391,6 +392,57 @@
                 }
             } catch (err) {
                 console.error("Error checking status", err);
+            }
+        }
+
+        function formatUsdCents(cents) {
+            const n = Number(cents) || 0;
+            return `US$${(n / 100).toFixed(2)}`;
+        }
+
+        async function loadPhysicalOrders() {
+            const wrap = document.getElementById('physicalOrdersList');
+            if (!wrap) return;
+            wrap.innerHTML = '<p style="color:var(--text-grey);">Cargando pedidos…</p>';
+            try {
+                const res = await fetch('/api/buyer/physical-orders', { credentials: 'include' });
+                if (!res.ok) {
+                    wrap.innerHTML = '<p style="color:var(--text-grey);">No se pudieron cargar los pedidos.</p>';
+                    return;
+                }
+                const orders = await res.json();
+                if (!orders.length) {
+                    wrap.innerHTML = `
+                        <div class="section-placeholder" style="padding: 60px 0;">
+                            <i class="fa-solid fa-box-open"></i>
+                            <p>Aún no tienes pedidos físicos. Compra formato impreso en el marketplace.</p>
+                            <a href="/libroia/marketplace.html" class="btn-read" style="margin-top:20px; max-width:280px;">Ir al catálogo</a>
+                        </div>`;
+                    return;
+                }
+                wrap.innerHTML = orders.map((o) => {
+                    let addr = '';
+                    try {
+                        const s = o.shipping_json ? JSON.parse(o.shipping_json) : null;
+                        if (s && s.address) {
+                            const a = s.address;
+                            addr = [a.line1, a.line2, a.city, a.state, a.postal_code, a.country].filter(Boolean).join(', ');
+                        }
+                    } catch (_) { /* ignore */ }
+                    const lines = (o.lines || []).map((l) => `<li>${l.title || l.book_id} — ${formatUsdCents(l.amount_total)}</li>`).join('');
+                    return `
+                        <div class="book-card" style="max-width:720px;">
+                            <div class="book-info">
+                                <h3>Pedido #${o.id}</h3>
+                                <p style="font-size:12px; color:var(--text-grey);">${o.created_at || ''}</p>
+                                <p><strong>Total:</strong> ${formatUsdCents(o.amount_total)} · <strong>Envío incluido en total:</strong> ${formatUsdCents(o.shipping_cents)}</p>
+                                ${addr ? `<p style="font-size:13px;"><strong>Envío a:</strong> ${addr}</p>` : ''}
+                                <ul style="margin:12px 0 0 18px; font-size:13px; color:var(--text-grey);">${lines}</ul>
+                            </div>
+                        </div>`;
+                }).join('');
+            } catch (e) {
+                wrap.innerHTML = '<p style="color:var(--text-grey);">Error de red.</p>';
             }
         }
 
@@ -441,6 +493,10 @@
         
         checkUserStatus();
         loadLibrary();
+        if (new URLSearchParams(window.location.search).get('section') === 'pedidos') {
+            const link = document.querySelector('a.nav-link[onclick*="pedidos"]');
+            showSection('pedidos', link);
+        }
     </script>
 </body>
 </html>

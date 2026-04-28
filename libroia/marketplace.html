@@ -349,9 +349,13 @@
         </section>
 
         <div class="m-tabs">
-            <div class="m-tab active" id="tabMarket">Explorar Galería</div>
-            <div class="m-tab" id="tabLibrary">Mi Biblioteca Personal</div>
+            <div class="m-tab active" id="tabMarket">Catálogo (venta)</div>
+            <div class="m-tab" id="tabLibrary">Mis libros (PDF comprados)</div>
         </div>
+        <p style="text-align:center; margin:-36px 0 48px; color: var(--text-grey); font-size: 13px;">
+            Pedidos físicos y biblioteca completa:
+            <a href="/dashboard" style="color: var(--accent-ocre); margin-left: 6px;">Ir al panel (dashboard)</a>
+        </p>
 
         <div id="bookGrid" class="m-grid">
             <!-- Libros se cargarán aquí -->
@@ -389,7 +393,7 @@
         <div style="margin-top:18px; border-top:1px solid var(--border-subtle); padding-top:12px;">
             <p style="margin:0; color:var(--text-grey);" id="cartTotals">Total PDF: US$0.00</p>
             <button id="checkoutPdfBtn" class="btn-buy-mini" style="margin-top:10px; width:100%;">Comprar PDF ahora</button>
-            <button id="checkoutPhysicalBtn" class="btn-ghost" style="margin-top:8px; width:100%;">Solicitar libros físicos</button>
+            <button id="checkoutPhysicalBtn" class="btn-ghost" style="margin-top:8px; width:100%;">Pagar pedido físico (Stripe)</button>
         </div>
     </aside>
 

@@ -19,6 +19,7 @@ const checkoutPhysicalBtn = document.getElementById("checkoutPhysicalBtn");
 
 let currentView = "market";
 let currentUser = null;
+const publicCfg = { physicalShippingCents: 999 };
 let selectedBookForPurchase = null;
 let selectedFormat = "pdf";
 const CART_KEY = "libroai_marketplace_cart_v1";
@@ -81,12 +82,15 @@ function renderCart() {
     cartCount.textContent = String(cart.length);
     if (!cart.length) {
         cartItemsWrap.innerHTML = `<p style="color:#94a3b8;">Tu carrito está vacío.</p>`;
-        cartTotals.textContent = "Total PDF: US$0.00";
+        cartTotals.textContent = "PDF: US$0.00 · Físico (libros): US$0.00 + envío único al pagar";
         return;
     }
     let pdfTotal = 0;
+    let physTotal = 0;
+    const shipUsd = (Number(publicCfg.physicalShippingCents) || 999) / 100;
     cartItemsWrap.innerHTML = cart.map((item) => {
         if (item.format === "pdf") pdfTotal += Number(item.price_usd || 0);
+        if (item.format === "physical") physTotal += Number(item.price_usd || 0);
         return `
             <div class="cart-item">
                 <strong>${item.title}</strong>
@@ -95,7 +99,8 @@ function renderCart() {
             </div>
         `;
     }).join("");
-    cartTotals.textContent = `Total PDF: US$${pdfTotal.toFixed(2)}`;
+    cartTotals.textContent =
+        `PDF: US$${pdfTotal.toFixed(2)} · Físico (libros): US$${physTotal.toFixed(2)} + envío US$${shipUsd.toFixed(2)} (un solo cargo al pagar con Stripe)`;
     cartItemsWrap.querySelectorAll("[data-remove]").forEach((btn) => {
         btn.addEventListener("click", () => {
             const [bookId, format] = btn.getAttribute("data-remove").split("|");
@@ -109,8 +114,8 @@ function setPurchaseFormat(format) {
     buyPdfOption.classList.toggle("active", format === "pdf");
     buyPhysicalOption.classList.toggle("active", format === "physical");
     purchaseHint.textContent = format === "pdf"
-        ? "PDF: acceso inmediato en tus libros comprados (requiere cuenta)."
-        : "Libro físico: se agrega al carrito como pedido físico para coordinación de envío.";
+        ? "PDF: acceso inmediato en «Mis libros» tras pagar con Stripe (requiere cuenta)."
+        : "Físico: pago real con Stripe; en el checkout indicas dirección de envío. Un cargo de envío por pedido completo.";
 }
 
 function openPurchaseModal(book) {
@@ -196,6 +201,19 @@ async function checkSession() {
     }
 }
 
+async function loadPublicCfg() {
+    try {
+        const res = await fetch("/api/config/public");
+        if (!res.ok) return;
+        const j = await res.json();
+        if (j && typeof j.physicalShippingCents === "number") {
+            publicCfg.physicalShippingCents = j.physicalShippingCents;
+        }
+    } catch {
+        /* defaults */
+    }
+}
+
 tabMarket.onclick = () => {
     tabMarket.classList.add("active");
     tabLibrary.classList.remove("active");
@@ -261,17 +279,45 @@ checkoutPdfBtn?.addEventListener("click", async () => {
     }
 });
 
-checkoutPhysicalBtn?.addEventListener("click", () => {
+checkoutPhysicalBtn?.addEventListener("click", async () => {
     const physicalItems = getCart().filter((i) => i.format === "physical");
     if (!physicalItems.length) {
         alert("No hay libros físicos en el carrito.");
         return;
     }
-    alert("Pedido físico registrado. Próximamente habilitaremos pago y envío en línea.");
+    if (!currentUser) {
+        alert("Debes iniciar sesión para el pedido físico. Te llevamos al inicio.");
+        window.location.href = "/";
+        return;
+    }
+    try {
+        const res = await fetch("/api/payments/create-physical-checkout-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ book_ids: physicalItems.map((i) => i.book_id) }),
+        });
+        const data = await res.json();
+        if (data.url) {
+            window.location.href = data.url;
+            return;
+        }
+        throw new Error(data.error || "No se pudo iniciar el checkout físico.");
+    } catch (err) {
+        alert(err.message || "Error de checkout.");
+    }
 });
 
 // Carga inicial
-checkSession().then(() => {
+Promise.all([checkSession(), loadPublicCfg()]).then(() => {
     renderCart();
-    loadMarketplace();
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "library") {
+        currentView = "library";
+        tabLibrary.classList.add("active");
+        tabMarket.classList.remove("active");
+        loadLibrary();
+    } else {
+        loadMarketplace();
+    }
 });
