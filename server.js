@@ -67,9 +67,10 @@ app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), pay
 app.use(express.json({ limit: "2mb" }));
 
 app.use((req, res, next) => {
-  // Permite flujo de popup OAuth (Google/Firebase) sin bloquear window.close/window.closed.
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  // Cambiado a unsafe-none para máxima compatibilidad con popups de Firebase/Google en producción
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
   res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+  
   if (DEV) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   }
@@ -77,11 +78,12 @@ app.use((req, res, next) => {
   if (p.startsWith("/api")) {
     res.setHeader("X-LibroAI", "1");
   }
-  // Log de depuración para rutas críticas
-  if (p === "/libroia" || p === "/dashboard" || p === "/escribir") {
-    console.log(`[DEBUG] Request: ${p}, SessionID: ${req.sessionID}, userId: ${req.session?.userId}`);
-  }
   next();
+});
+
+// Protector global contra cierres inesperados
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[CRASH PREVENTION] Unhandled Rejection at:", promise, "reason:", reason);
 });
 
 // ── Rutas API ─────────────────────────────────────────────────────────────────
