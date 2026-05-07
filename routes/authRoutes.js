@@ -233,8 +233,17 @@ router.post("/firebase", async (req, res) => {
     return res.status(401).json({ error: "Token de Firebase invalido." });
   }
 
-  const email = String(decodedToken.email || "").trim().toLowerCase();
+  let email = String(decodedToken.email || "").trim().toLowerCase();
   const sub = decodedToken.uid;
+  if (!email && sub) {
+    try {
+      const admin = getFirebaseAdmin();
+      const userRecord = await admin.auth().getUser(sub);
+      email = String(userRecord.email || "").trim().toLowerCase();
+    } catch {
+      // Si no se puede resolver email por uid, se valida abajo.
+    }
+  }
   if (!email || !sub) {
     return res.status(400).json({ error: "Token sin email o uid." });
   }
@@ -344,6 +353,17 @@ router.get("/me", (req, res) => {
   if (!u) {
     return res.status(200).json({ libroai: true, user: null });
   }
+
+  // Evita que la cuenta semilla demo quede pegada como sesión activa.
+  const seedEmail = String(process.env.DEFAULT_SEED_EMAIL || "demo@libroai.app").toLowerCase();
+  if (String(u.email || "").toLowerCase() === seedEmail) {
+    req.session.destroy(() => {
+      res.clearCookie("libro.sid");
+      return res.status(200).json({ libroai: true, user: null });
+    });
+    return;
+  }
+
   return res.status(200).json({ libroai: true, user: pick(u) });
 });
 

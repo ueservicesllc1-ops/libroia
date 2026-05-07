@@ -27,6 +27,24 @@ const closePreviewBtn = document.getElementById("closePreviewBtn");
 const printBtn = document.getElementById("printBtn");
 const previewOverlay = document.getElementById("previewOverlay");
 const previewContent = document.getElementById("previewContent");
+const realBookBtn = document.getElementById("realBookBtn");
+const realBookOverlay = document.getElementById("realBookOverlay");
+const closeRealBookBtn = document.getElementById("closeRealBookBtn");
+const realBookPrevBtn = document.getElementById("realBookPrevBtn");
+const realBookNextBtn = document.getElementById("realBookNextBtn");
+const realBookPageCounter = document.getElementById("realBookPageCounter");
+const realBookPage = document.getElementById("realBookPage");
+const realBookSoundBtn = document.getElementById("realBookSoundBtn");
+const realBookClickPrev = document.getElementById("realBookClickPrev");
+const realBookClickNext = document.getElementById("realBookClickNext");
+const desktopMenuBar = document.getElementById("desktopMenuBar");
+const recentProjectsWrap = document.getElementById("recentProjectsWrap");
+const uiDialogOverlay = document.getElementById("uiDialogOverlay");
+const uiDialogTitle = document.getElementById("uiDialogTitle");
+const uiDialogMessage = document.getElementById("uiDialogMessage");
+const uiDialogInput = document.getElementById("uiDialogInput");
+const uiDialogOkBtn = document.getElementById("uiDialogOkBtn");
+const uiDialogCancelBtn = document.getElementById("uiDialogCancelBtn");
 
 const loginOverlay = document.getElementById("loginOverlay");
 const authForm = document.getElementById("authForm");
@@ -107,7 +125,460 @@ let lastSuggestion = "";
 let currentUserId = null;
 let currentUser = null;  // objeto completo del usuario (incluye plan, is_admin, etc)
 let hasUnsavedChanges = false;
+let realBookPages = [];
+let realBookPageIndex = 0;
+let realBookFlip = null;
+let realBookNavLock = false;
+const REALBOOK_SOUND_KEY = "libroai_realbook_sound_enabled";
+let realBookSoundEnabled = (() => {
+  try {
+    const stored = localStorage.getItem(REALBOOK_SOUND_KEY);
+    return stored !== "0";
+  } catch {
+    return true;
+  }
+})();
 const BLOCKED_PLANS_MODAL_KEY = "libroai_blocked_plans_modal_last_shown";
+const DEMO_SEED_EMAIL = "demo@libroai.app";
+let bookMetaSaveTimer = null;
+
+function openUiDialog({ title = "Mensaje", message = "", mode = "alert", defaultValue = "" }) {
+  return new Promise((resolve) => {
+    if (!uiDialogOverlay) {
+      resolve(mode === "confirm" ? false : mode === "prompt" ? null : undefined);
+      return;
+    }
+    uiDialogTitle.textContent = title;
+    uiDialogMessage.textContent = message;
+    uiDialogInput.hidden = mode !== "prompt";
+    uiDialogInput.value = defaultValue || "";
+    uiDialogCancelBtn.hidden = mode === "alert";
+    uiDialogOverlay.hidden = false;
+
+    const cleanup = () => {
+      uiDialogOverlay.hidden = true;
+      uiDialogOkBtn.onclick = null;
+      uiDialogCancelBtn.onclick = null;
+      uiDialogOverlay.onclick = null;
+      document.removeEventListener("keydown", onKey);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(mode === "confirm" ? false : mode === "prompt" ? null : undefined);
+    };
+    const onOk = () => {
+      cleanup();
+      if (mode === "confirm") resolve(true);
+      else if (mode === "prompt") resolve(uiDialogInput.value);
+      else resolve(undefined);
+    };
+    const onKey = (e) => {
+      if (uiDialogOverlay.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        onOk();
+      }
+    };
+
+    uiDialogOkBtn.onclick = onOk;
+    uiDialogCancelBtn.onclick = onCancel;
+    uiDialogOverlay.onclick = (e) => {
+      if (e.target === uiDialogOverlay) onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    if (mode === "prompt") setTimeout(() => uiDialogInput.focus(), 0);
+    else setTimeout(() => uiDialogOkBtn.focus(), 0);
+  });
+}
+
+async function uiAlert(message, title = "Aviso") {
+  await openUiDialog({ title, message, mode: "alert" });
+}
+
+async function uiConfirm(message, title = "Confirmar") {
+  return openUiDialog({ title, message, mode: "confirm" });
+}
+
+async function uiPrompt(message, defaultValue = "", title = "Escribe un valor") {
+  return openUiDialog({ title, message, mode: "prompt", defaultValue });
+}
+
+function updateRealBookSoundButton() {
+  if (!realBookSoundBtn) return;
+  realBookSoundBtn.textContent = realBookSoundEnabled ? "🔊 Sonido" : "🔇 Silencio";
+}
+
+function playPageFlipSound() {
+  if (!realBookSoundEnabled) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+
+    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
+    const channelData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < channelData.length; i += 1) {
+      channelData[i] = (Math.random() * 2 - 1) * (1 - i / channelData.length);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 850;
+    filter.Q.value = 0.8;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.045, now + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(now);
+    src.stop(now + 0.12);
+    src.onended = () => ctx.close();
+  } catch {
+    // Silenciar errores de audio en navegadores restringidos.
+  }
+}
+
+function htmlToReadableText(html) {
+  const d = document.createElement("div");
+  d.innerHTML = String(html || "");
+  const text = d.textContent || d.innerText || "";
+  return text
+    .replace(/\r/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\t/g, "    ")
+    .replace(/[ ]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function textToEditorHtml(text) {
+  const safe = String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return safe
+    .split(/\n{2,}/)
+    .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+function updateRealBookCounter() {
+  if (!realBookPageCounter || !realBookFlip) return;
+  const idx = Number(realBookFlip.getCurrentPageIndex() || 0) + 1;
+  const total = Number(realBookFlip.getPageCount() || 1);
+  realBookPageCounter.textContent = `Página ${idx} de ${total}`;
+  if (realBookPrevBtn) realBookPrevBtn.disabled = idx <= 1;
+  if (realBookNextBtn) realBookNextBtn.disabled = idx >= total;
+}
+
+async function buildBookPdfBuffer(book) {
+  if (!window.jspdf?.jsPDF) {
+    throw new Error("No se pudo cargar el generador PDF.");
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const w = doc.internal.pageSize.getWidth();   // 595.28
+  const h = doc.internal.pageSize.getHeight();  // 841.89
+
+  const ML = 72;   // margin left
+  const MR = 72;   // margin right
+  const MT = 80;   // margin top
+  const MB = 80;   // margin bottom
+  const TW = w - ML - MR;  // text width
+  const LS = 17;   // line step (pt)
+  const FS = 11.5; // body font size
+
+  let pageNum = 0;
+
+  function addPageNum() {
+    if (pageNum < 1) return;
+    doc.setFont("times", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(140, 120, 90);
+    const label = String(pageNum);
+    if (pageNum % 2 === 0) {
+      doc.text(label, ML, h - 36);
+    } else {
+      doc.text(label, w - MR, h - 36, { align: "right" });
+    }
+    doc.setTextColor(0, 0, 0);
+  }
+
+  function newPage() {
+    if (pageNum > 0) addPageNum();
+    doc.addPage();
+    pageNum++;
+    return MT;
+  }
+
+  // Cover page
+  const title    = String(book.title      || "Mi libro");
+  const author   = String(book.authorName || "");
+  const genre    = String(book.genre      || "");
+  const synopsis = String(book.synopsis   || "");
+
+  doc.setFillColor(249, 243, 228);
+  doc.rect(0, 0, w, h, "F");
+
+  doc.setDrawColor(160, 130, 60);
+  doc.setLineWidth(0.5);
+  doc.line(ML, 90, w - MR, 90);
+  doc.setLineWidth(0.2);
+  doc.line(ML, 94, w - MR, 94);
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(32);
+  doc.setTextColor(25, 18, 8);
+  const titleLines = doc.splitTextToSize(title, TW);
+  let ty = 180;
+  titleLines.forEach((ln) => { doc.text(ln, w / 2, ty, { align: "center" }); ty += 40; });
+
+  doc.setFont("times", "normal");
+  doc.setFontSize(16);
+  doc.setTextColor(160, 130, 60);
+  doc.text("\u2726  \u2726  \u2726", w / 2, ty + 20, { align: "center" });
+
+  doc.setFont("times", "italic");
+  doc.setFontSize(15);
+  doc.setTextColor(80, 65, 35);
+  doc.text(author, w / 2, ty + 60, { align: "center" });
+
+  if (genre) {
+    doc.setFont("times", "normal");
+    doc.setFontSize(11);
+    doc.setTextColor(130, 110, 70);
+    doc.text(genre.toUpperCase(), w / 2, ty + 86, { align: "center", charSpace: 2 });
+  }
+
+  if (synopsis) {
+    doc.setFont("times", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 85, 55);
+    const synLines = doc.splitTextToSize(synopsis, TW - 60);
+    let sy = ty + 130;
+    synLines.slice(0, 6).forEach((ln) => { doc.text(ln, w / 2, sy, { align: "center" }); sy += 16; });
+  }
+
+  doc.setDrawColor(160, 130, 60);
+  doc.setLineWidth(0.5);
+  doc.line(ML, h - 90, w - MR, h - 90);
+  doc.setLineWidth(0.2);
+  doc.line(ML, h - 86, w - MR, h - 86);
+  doc.setFont("times", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(140, 120, 80);
+  doc.text("LibroAI", w / 2, h - 60, { align: "center" });
+
+  // Chapters
+  const chapters = Array.isArray(book.chapters) ? book.chapters : [];
+
+  chapters.forEach((ch, i) => {
+    // Chapter title page
+    if (pageNum > 0) addPageNum();
+    doc.addPage();
+    pageNum++;
+
+    doc.setFillColor(248, 242, 226);
+    doc.rect(0, 0, w, h, "F");
+
+    const chTitle = String(ch?.title || ("Cap\u00edtulo " + (i + 1)));
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(13);
+    doc.setTextColor(150, 120, 60);
+    doc.text("CAP\u00cdTULO", w / 2, h / 2 - 60, { align: "center", charSpace: 3 });
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(25, 18, 8);
+    const chTitleLines = doc.splitTextToSize(chTitle, TW - 40);
+    let cty = h / 2 - 20;
+    chTitleLines.forEach((ln) => { doc.text(ln, w / 2, cty, { align: "center" }); cty += 36; });
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    doc.setTextColor(160, 130, 60);
+    doc.text("\u2726", w / 2, cty + 20, { align: "center" });
+
+    // Content pages
+    let y = newPage();
+
+    // Running header
+    doc.setFont("times", "italic");
+    doc.setFontSize(8.5);
+    doc.setTextColor(150, 130, 90);
+    doc.text(title, w / 2, 52, { align: "center" });
+    doc.setDrawColor(200, 180, 130);
+    doc.setLineWidth(0.3);
+    doc.line(ML, 58, w - MR, 58);
+    doc.setTextColor(0, 0, 0);
+
+    const rawText = htmlToReadableText(ch?.content || "") || "(Cap\u00edtulo vac\u00edo)";
+    const paragraphs = rawText
+      .split(/\n{2,}/)
+      .map((p) => p.replace(/\n/g, " ").trim())
+      .filter(Boolean);
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(FS);
+    doc.setTextColor(22, 16, 6);
+
+    let firstPara = true;
+    paragraphs.forEach((para) => {
+      const lines  = doc.splitTextToSize(para, TW);
+      const blockH = lines.length * LS;
+
+      if (y + blockH > h - MB) {
+        y = newPage();
+        doc.setFont("times", "italic");
+        doc.setFontSize(8.5);
+        doc.setTextColor(150, 130, 90);
+        doc.text(chTitle, w / 2, 52, { align: "center" });
+        doc.setDrawColor(200, 180, 130);
+        doc.setLineWidth(0.3);
+        doc.line(ML, 58, w - MR, 58);
+        doc.setFont("times", "normal");
+        doc.setFontSize(FS);
+        doc.setTextColor(22, 16, 6);
+      }
+
+      const indent = firstPara ? 0 : 22;
+      firstPara = false;
+
+      lines.forEach((line, li) => {
+        const isLast = li === lines.length - 1;
+        const xStart = ML + (li === 0 ? indent : 0);
+        const xWidth = TW - (li === 0 ? indent : 0);
+
+        if (!isLast && lines.length > 1) {
+          const words = line.trim().split(/\s+/);
+          if (words.length > 1) {
+            const textW  = doc.getTextWidth(words.join(""));
+            const spaceW = (xWidth - textW) / (words.length - 1);
+            let wx = xStart;
+            words.forEach((word) => {
+              doc.text(word, wx, y);
+              wx += doc.getTextWidth(word) + spaceW;
+            });
+          } else {
+            doc.text(line, xStart, y);
+          }
+        } else {
+          doc.text(line, xStart, y);
+        }
+        y += LS;
+      });
+
+      y += 8;
+    });
+
+    addPageNum();
+  });
+
+  return doc.output("arraybuffer");
+}
+
+async function renderPdfFlipbook(pdfBuffer) {
+  if (!window.pdfjsLib) throw new Error("No se pudo cargar PDF.js.");
+  if (!window.St?.PageFlip) throw new Error("No se pudo cargar el motor flipbook.");
+  if (!realBookPage) return;
+
+  const pdfjs = window.pdfjsLib;
+  pdfjs.GlobalWorkerOptions.workerSrc =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
+  const pdf  = await pdfjs.getDocument({ data: pdfBuffer }).promise;
+  const host = document.createElement("div");
+  host.className = "realbook-flipbook";
+  realBookPage.innerHTML = "";
+  realBookPage.appendChild(host);
+
+  const SCALE = 2.0; // 2x for crisp retina rendering
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page   = await pdf.getPage(p);
+    const vp     = page.getViewport({ scale: SCALE });
+    const canvas = document.createElement("canvas");
+    const ctx    = canvas.getContext("2d");
+    canvas.width  = vp.width;
+    canvas.height = vp.height;
+    ctx.fillStyle = "#f8f2e0";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+    const img     = document.createElement("img");
+    img.src       = canvas.toDataURL("image/jpeg", 0.94);
+    img.alt       = "P\u00e1gina " + p;
+    img.className = "realbook-pdf-image";
+    img.draggable = false;
+
+    const div     = document.createElement("div");
+    div.className = "realbook-flip-page";
+    div.appendChild(img);
+    host.appendChild(div);
+  }
+
+  if (realBookFlip) {
+    try { realBookFlip.destroy(); } catch {}
+    realBookFlip = null;
+  }
+
+  realBookFlip = new window.St.PageFlip(host, {
+    width:               500,
+    height:              708,
+    size:                "stretch",
+    minWidth:            280,
+    maxWidth:            1000,
+    minHeight:           380,
+    maxHeight:           1420,
+    drawShadow:          true,
+    flippingTime:        750,
+    usePortrait:         false,
+    startZIndex:         10,
+    maxShadowOpacity:    0.45,
+    showCover:           true,
+    mobileScrollSupport: false,
+    clickEventForward:   false,
+  });
+  realBookFlip.loadFromHTML(host.querySelectorAll(".realbook-flip-page"));
+
+  realBookFlip.on("flip", () => {
+    updateRealBookCounter();
+    playPageFlipSound();
+    setTimeout(() => { realBookNavLock = false; }, 150);
+  });
+  realBookFlip.on("changeOrientation", () => {
+    updateRealBookCounter();
+    realBookNavLock = false;
+  });
+  updateRealBookCounter();
+}
+
+function goRealBookPrev() {
+  if (!realBookFlip) return;
+  if (realBookNavLock) return;
+  realBookNavLock = true;
+  realBookFlip.flipPrev();
+}
+
+function goRealBookNext() {
+  if (!realBookFlip) return;
+  if (realBookNavLock) return;
+  realBookNavLock = true;
+  realBookFlip.flipNext();
+}
 
 function shouldAutoOpenBlockedPlansModal() {
   try {
@@ -138,8 +609,14 @@ const revCancelBtn = document.getElementById("revCancelBtn");
 let currentRevisionData = null;
 
 // Helper: muestra el modal de planes si el usuario no tiene plan PRO
+function hasProAccess(user) {
+  if (!user) return false;
+  const p = String(user.plan || "").toLowerCase();
+  return user.is_admin || p === "pro" || p === "basic";
+}
+
 function requireProUI() {
-  if (currentUser && (currentUser.plan === 'pro' || currentUser.is_admin)) return true;
+  if (hasProAccess(currentUser)) return true;
   // Abrir modal de planes
   const plansModal = document.getElementById('plansModal');
   if (plansModal) plansModal.hidden = false;
@@ -150,7 +627,7 @@ function requireProUI() {
 document.getElementById("aiReviseChapterBtn")?.addEventListener("click", async () => {
   if (!requireProUI()) return;
   const content = editor.innerHTML;
-  if (!content || content.length < 50) return alert("Escribe un poco más para poder revisar.");
+  if (!content || content.length < 50) return uiAlert("Escribe un poco más para poder revisar.");
   setStatus("✨ Revisando capítulo...");
   try {
     const res = await fetch("/api/ai/revise-chapter", {
@@ -166,8 +643,51 @@ document.getElementById("aiReviseChapterBtn")?.addEventListener("click", async (
     revOverlay.hidden = false;
     setStatus("Revisión lista");
   } catch (err) {
-    alert("Error: " + err.message);
+    uiAlert("Error: " + err.message);
     setStatus("Error en revisión");
+  }
+});
+
+// Botón: Revisar Libro [PRO]
+document.getElementById("aiReviseBookBtn")?.addEventListener("click", async () => {
+  if (!requireProUI()) return;
+  const book = getSelectedBook();
+  if (!book || !Array.isArray(book.chapters) || !book.chapters.length) {
+    return uiAlert("Selecciona un libro con capítulos para revisar.");
+  }
+
+  setStatus("📚 Revisando libro completo...");
+  try {
+    const revisedByChapterId = {};
+    for (let i = 0; i < book.chapters.length; i += 1) {
+      const ch = book.chapters[i];
+      const content = htmlToReadableText(ch.content || "");
+      if (!content || content.length < 30) {
+        revisedByChapterId[ch.id] = ch.content || "";
+        continue;
+      }
+
+      setStatus(`📚 Revisando capítulo ${i + 1}/${book.chapters.length}...`);
+      const res = await fetch("/api/ai/revise-chapter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, book_id: selectedBookId }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Error revisando capítulo ${i + 1}`);
+      }
+      revisedByChapterId[ch.id] = textToEditorHtml(data.revised || "");
+    }
+
+    revOriginal.textContent = `Capítulos detectados: ${book.chapters.length}\n\nSe generó una propuesta de revisión para todo el libro.`;
+    revProposed.textContent = "La revisión está lista. Pulsa \"Aplicar Cambios\" para reemplazar cada capítulo con su versión corregida.";
+    currentRevisionData = { type: "book", revisedByChapterId };
+    revOverlay.hidden = false;
+    setStatus("Revisión completa del libro lista");
+  } catch (err) {
+    uiAlert("Error: " + err.message);
+    setStatus("Error en revisión de libro");
   }
 });
 
@@ -194,7 +714,7 @@ document.getElementById("aiOrganizeBtn")?.addEventListener("click", async () => 
     revOverlay.hidden = false;
     setStatus("Organización lista");
   } catch (err) {
-    alert("Error: " + err.message);
+    uiAlert("Error: " + err.message);
     setStatus("Error en organización");
   }
 });
@@ -205,12 +725,44 @@ revCancelBtn?.addEventListener("click", () => {
 });
 
 revApplyBtn?.addEventListener("click", () => {
+  if (currentRevisionData?.type === "book") {
+    const book = getSelectedBook();
+    if (!book) {
+      revOverlay.hidden = true;
+      currentRevisionData = null;
+      return;
+    }
+    const revisedByChapterId = currentRevisionData.revisedByChapterId || {};
+    const now = new Date().toISOString();
+    book.chapters.forEach((ch) => {
+      if (Object.prototype.hasOwnProperty.call(revisedByChapterId, ch.id)) {
+        ch.content = revisedByChapterId[ch.id];
+        ch.updatedAt = now;
+      }
+    });
+    book.updatedAt = now;
+    const { doc, setDoc } = window.fb;
+    setDoc(doc(window.firebaseDb, "books", book.id), book)
+      .then(() => {
+        syncEditorFromSelection();
+        renderBooks();
+        setStatus("✅ Revisión del libro aplicada");
+      })
+      .catch((err) => {
+        console.error(err);
+        setStatus("⚠️ Error al guardar revisión del libro");
+      });
+    revOverlay.hidden = true;
+    currentRevisionData = null;
+    return;
+  }
+
   if (currentRevisionData) {
     editor.innerHTML = currentRevisionData.content;
     saveCurrentChapter(); 
     revOverlay.hidden = true;
     currentRevisionData = null;
-    alert("Cambios aplicados correctamente.");
+    uiAlert("Cambios aplicados correctamente.");
   }
 });
 
@@ -258,7 +810,7 @@ async function finishOnboarding() {
   const author = obAuthorName.value.trim();
 
   if (!title) {
-    alert("Por favor, ponle un título a tu libro.");
+    uiAlert("Por favor, ponle un título a tu libro.");
     showOnboardingStep(1);
     return;
   }
@@ -425,6 +977,179 @@ function getSelectedChapter() {
   return book.chapters.find((c) => c.id === selectedChapterId) || null;
 }
 
+function closeDesktopMenus() {
+  document.querySelectorAll(".desktop-menu-item.open").forEach((item) => item.classList.remove("open"));
+  document.querySelectorAll(".desktop-menu-dropdown button.menu-kbd-active").forEach((b) => b.classList.remove("menu-kbd-active"));
+}
+
+function getOpenDesktopMenuItem() {
+  return document.querySelector(".desktop-menu-item.open");
+}
+
+function getOpenDesktopMenuButtons() {
+  const openItem = getOpenDesktopMenuItem();
+  if (!openItem) return [];
+  return [...openItem.querySelectorAll(".desktop-menu-dropdown button")].filter((btn) => btn.offsetParent !== null);
+}
+
+function moveMenuKeyboardSelection(step) {
+  const buttons = getOpenDesktopMenuButtons();
+  if (!buttons.length) return;
+  let idx = buttons.findIndex((b) => b.classList.contains("menu-kbd-active"));
+  if (idx < 0) idx = 0;
+  else idx = (idx + step + buttons.length) % buttons.length;
+  buttons.forEach((b) => b.classList.remove("menu-kbd-active"));
+  buttons[idx].classList.add("menu-kbd-active");
+}
+
+function openDesktopMenu(name) {
+  const item = desktopMenuBar?.querySelector(`.desktop-menu-item[data-menu="${name}"]`);
+  if (!item) return;
+  closeDesktopMenus();
+  item.classList.add("open");
+  if (name === "file") {
+    refreshRecentProjectsMenu();
+    const hasProject = !!getSelectedBook();
+    item.querySelector('[data-file-action="save"]')?.toggleAttribute("disabled", !hasProject);
+    item.querySelector('[data-file-action="saveAs"]')?.toggleAttribute("disabled", !hasProject);
+    item.querySelector('[data-file-action="closeProject"]')?.toggleAttribute("disabled", !hasProject);
+  }
+  moveMenuKeyboardSelection(0);
+}
+
+function openProjectSelectorMenu() {
+  if (books.length > 0) {
+    obBookSelectorList.innerHTML = "";
+    books.forEach((book) => {
+      const item = document.createElement("div");
+      item.className = "ob-book-item";
+      const date = new Date(book.updatedAt || book.createdAt).toLocaleDateString();
+      item.innerHTML = `
+        <div class="ob-book-info">
+          <span class="ob-book-name">${book.title}</span>
+          <span class="ob-book-meta">${book.genre || "Sin género"} • ${book.chapters.length} cap. • ${date}</span>
+        </div>
+        <span class="ob-icon">➡️</span>
+      `;
+      item.onclick = () => {
+        selectedBookId = book.id;
+        selectedChapterId = book.chapters[0]?.id || null;
+        onboardingOverlay.hidden = true;
+        document.body.classList.remove("is-loading");
+        syncEditorFromSelection();
+        renderBooks();
+        addMessage("ai", `¡Excelente elección! 👋 He cargado **"${book.title}"**. ¿Qué te gustaría trabajar ahora?`);
+      };
+      obBookSelectorList.appendChild(item);
+    });
+    showOnboardingStep("obStepOpen");
+    onboardingOverlay.hidden = false;
+    return;
+  }
+
+  uiAlert("No encontramos proyectos guardados en tu cuenta. Vamos a crear uno nuevo.");
+  resetOnboarding();
+  showOnboardingStep(1);
+  onboardingOverlay.hidden = false;
+}
+
+function refreshRecentProjectsMenu() {
+  if (!recentProjectsWrap) return;
+  recentProjectsWrap.innerHTML = "";
+  const recent = [...books]
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+    .slice(0, 6);
+  recent.forEach((book) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = book.title || "Proyecto sin título";
+    btn.addEventListener("click", () => {
+      selectedBookId = book.id;
+      selectedChapterId = book.chapters[0]?.id || null;
+      syncEditorFromSelection();
+      renderBooks();
+      setStatus(`Proyecto abierto: ${book.title}`);
+      closeDesktopMenus();
+    });
+    recentProjectsWrap.appendChild(btn);
+  });
+}
+
+async function handleFileAction(action) {
+  const confirmSaveIfNeeded = async () => {
+    if (!hasUnsavedChanges || !getSelectedBook()) return true;
+    const saveNow = await uiConfirm("Tienes cambios sin guardar. ¿Quieres guardar antes de continuar?");
+    if (saveNow) await saveCurrentChapter();
+    return true;
+  };
+
+  if (action === "new") {
+    await confirmSaveIfNeeded();
+    resetOnboarding();
+    showOnboardingStep(1);
+    onboardingOverlay.hidden = false;
+  } else if (action === "save") {
+    await saveCurrentChapter();
+  } else if (action === "saveAs") {
+    const source = getSelectedBook();
+    if (!source) return;
+    const title = await uiPrompt("Guardar como (nombre del nuevo proyecto):", `${source.title || "Proyecto"} (copia)`);
+    if (!title) return;
+    const created = await createBook(title.trim(), source.genre || "", source.authorName || "");
+    if (!created) return;
+    created.chapters = source.chapters.map((ch) => ({
+      ...ch,
+      id: crypto.randomUUID(),
+      updatedAt: new Date().toISOString(),
+    }));
+    const { doc, setDoc } = window.fb;
+    await setDoc(doc(window.firebaseDb, "books", created.id), created);
+    const idx = books.findIndex((b) => b.id === created.id);
+    if (idx >= 0) books[idx] = created;
+    selectedBookId = created.id;
+    selectedChapterId = created.chapters[0]?.id || null;
+    renderBooks();
+    syncEditorFromSelection();
+    setStatus("Proyecto guardado como copia");
+  } else if (action === "open") {
+    await confirmSaveIfNeeded();
+    openProjectSelectorMenu();
+  } else if (action === "closeProject") {
+    await confirmSaveIfNeeded();
+    selectedBookId = null;
+    selectedChapterId = null;
+    editor.innerHTML = "";
+    chapterTitle.value = "";
+    renderBooks();
+    setStatus("Proyecto cerrado");
+  } else if (action === "exit") {
+    await confirmSaveIfNeeded();
+    window.location.href = "/dashboard";
+  }
+}
+
+async function handleEditAction(action) {
+  const cmdMap = { undo: "undo", redo: "redo", cut: "cut", copy: "copy", selectAll: "selectAll" };
+  if (action === "paste") {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.execCommand("insertText", false, text);
+    } catch {
+      uiAlert("No se pudo pegar automáticamente. Usa Ctrl+V.");
+    }
+    return;
+  }
+  if (cmdMap[action]) document.execCommand(cmdMap[action], false, null);
+}
+
+function handleHelpAction(action) {
+  if (action === "shortcuts") {
+    uiAlert("Atajos:\nCtrl+S Guardar\nCtrl+B Negrita\nCtrl+I Itálica\nCtrl+U Subrayado");
+  } else if (action === "about") {
+    uiAlert("LibroAI Editor\nEscritura asistida con IA para crear, revisar y publicar libros.");
+  }
+}
+
 function getModelMode() {
   const el = document.querySelector('input[name="aiTier"]:checked');
   return el && el.value === "sonnet" ? "sonnet" : "included";
@@ -477,10 +1202,10 @@ function addMessage(role, text) {
       });
     });
 
-    btns[1].addEventListener("click", () => {
+    btns[1].addEventListener("click", async () => {
       const htmlText = getHtml();
       if (!htmlText) return;
-      if (confirm("¿Estás seguro de que quieres REEMPLAZAR todo el texto de este capítulo con la sugerencia de la IA?")) {
+      if (await uiConfirm("¿Estás seguro de que quieres REEMPLAZAR todo el texto de este capítulo con la sugerencia de la IA?")) {
         editor.innerHTML = htmlText;
         hasUnsavedChanges = true;
         saveCurrentChapter().then(() => {
@@ -570,6 +1295,7 @@ function renderBooks() {
     bookList.appendChild(card);
   });
   // El botón de "Ver Todo" se maneja por su propio listener fijo
+  refreshRecentProjectsMenu();
 }
 
 function syncEditorFromSelection() {
@@ -733,6 +1459,12 @@ async function ensureSession() {
     const r = await fetch("/api/auth/me", fetchOpts);
     const data = await r.json().catch(() => ({}));
     if (data && data.user != null) {
+      const email = String(data.user.email || "").trim().toLowerCase();
+      if (email === DEMO_SEED_EMAIL) {
+        await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        loginOverlay.hidden = false;
+        return null;
+      }
       loginOverlay.hidden = true;
       return data.user;
     }
@@ -847,8 +1579,17 @@ async function saveBookMeta() {
   }
 }
 
+function scheduleBookMetaSave(delayMs = 500) {
+  const book = getSelectedBook();
+  if (!book) return;
+  clearTimeout(bookMetaSaveTimer);
+  bookMetaSaveTimer = setTimeout(() => {
+    saveBookMeta().catch((error) => setStatus(error.message || "Error al guardar metadatos"));
+  }, delayMs);
+}
+
 async function createBook(manualTitle, manualGenre, manualAuthor) {
-  const title = manualTitle || prompt("Titulo del nuevo libro:");
+  const title = manualTitle || (await uiPrompt("Titulo del nuevo libro:", ""));
   if (!title) return;
   setStatus("Creando libro...");
   
@@ -1042,6 +1783,59 @@ saveBookMetaBtn.addEventListener("click", () => {
   saveBookMeta().catch((error) => setStatus(error.message));
 });
 
+bookTitleInput?.addEventListener("input", () => scheduleBookMetaSave(450));
+bookGenreInput?.addEventListener("input", () => scheduleBookMetaSave(550));
+bookAuthorInput?.addEventListener("input", () => scheduleBookMetaSave(550));
+bookSynopsisInput?.addEventListener("input", () => scheduleBookMetaSave(700));
+
+bookTitleInput?.addEventListener("blur", () => scheduleBookMetaSave(0));
+bookTitleInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    scheduleBookMetaSave(0);
+  }
+});
+
+desktopMenuBar?.addEventListener("click", async (e) => {
+  const disabledBtn = e.target.closest("button:disabled");
+  if (disabledBtn) {
+    e.preventDefault();
+    return;
+  }
+  const trigger = e.target.closest(".desktop-menu-trigger");
+  if (trigger) {
+    const item = trigger.closest(".desktop-menu-item");
+    const alreadyOpen = item.classList.contains("open");
+    closeDesktopMenus();
+    if (!alreadyOpen) {
+      item.classList.add("open");
+      if (item.dataset.menu === "file") refreshRecentProjectsMenu();
+      moveMenuKeyboardSelection(0);
+    }
+    return;
+  }
+
+  const fileAction = e.target.closest("[data-file-action]")?.getAttribute("data-file-action");
+  if (fileAction) {
+    await handleFileAction(fileAction);
+    closeDesktopMenus();
+    return;
+  }
+
+  const editAction = e.target.closest("[data-edit-action]")?.getAttribute("data-edit-action");
+  if (editAction) {
+    await handleEditAction(editAction);
+    closeDesktopMenus();
+    return;
+  }
+
+  const helpAction = e.target.closest("[data-help-action]")?.getAttribute("data-help-action");
+  if (helpAction) {
+    handleHelpAction(helpAction);
+    closeDesktopMenus();
+  }
+});
+
 triggerCoverUpload.addEventListener("click", () => bookCoverFile.click());
 
 bookCoverFile.addEventListener("change", async (e) => {
@@ -1050,7 +1844,7 @@ bookCoverFile.addEventListener("change", async (e) => {
 
   const book = getSelectedBook();
   if (!book) {
-    alert("Selecciona un libro antes de subir una portada.");
+    uiAlert("Selecciona un libro antes de subir una portada.");
     return;
   }
 
@@ -1084,7 +1878,7 @@ bookCoverFile.addEventListener("change", async (e) => {
   } catch (err) {
     console.error(err);
     coverUploadStatus.textContent = "Error";
-    alert("No se pudo subir la imagen: " + err.message);
+    uiAlert("No se pudo subir la imagen: " + err.message);
   }
 });
 
@@ -1092,7 +1886,7 @@ removeCoverBtn.addEventListener("click", async () => {
   const book = getSelectedBook();
   if (!book) return;
   
-  if (confirm("¿Quitar la portada de este libro?")) {
+  if (await uiConfirm("¿Quitar la portada de este libro?")) {
     book.coverUrl = null;
     bookCoverPreview.hidden = true;
     coverImg.src = "";
@@ -1171,7 +1965,7 @@ publishConfirmBtn?.addEventListener("click", async () => {
 
     closePublishModal();
     setStatus("Libro publicado");
-    alert("¡Libro publicado con éxito! Ya está visible en Marketplace.");
+    uiAlert("¡Libro publicado con éxito! Ya está visible en Marketplace.");
     window.open("/libroia/marketplace.html", "_blank");
   } catch (err) {
     setPublishError(err.message || "Error al publicar.");
@@ -1190,42 +1984,12 @@ newBookBtn?.addEventListener("click", () => {
 
 // Onboarding Listeners
 obNewBookBtn.addEventListener("click", () => showOnboardingStep(1));
-obOpenBookBtn.addEventListener("click", () => {
-  if (books.length > 0) {
-    obBookSelectorList.innerHTML = "";
-    books.forEach(book => {
-      const item = document.createElement("div");
-      item.className = "ob-book-item";
-      const date = new Date(book.updatedAt || book.createdAt).toLocaleDateString();
-      item.innerHTML = `
-        <div class="ob-book-info">
-          <span class="ob-book-name">${book.title}</span>
-          <span class="ob-book-meta">${book.genre || "Sin género"} • ${book.chapters.length} cap. • ${date}</span>
-        </div>
-        <span class="ob-icon">➡️</span>
-      `;
-      item.onclick = () => {
-        selectedBookId = book.id;
-        selectedChapterId = book.chapters[0]?.id || null;
-        onboardingOverlay.hidden = true;
-        document.body.classList.remove('is-loading');
-        syncEditorFromSelection();
-        renderBooks();
-        addMessage("ai", `¡Excelente elección! 👋 He cargado **"${book.title}"**. ¿Qué te gustaría trabajar ahora?`);
-      };
-      obBookSelectorList.appendChild(item);
-    });
-    showOnboardingStep("obStepOpen");
-  } else {
-    alert("No encontramos proyectos guardados en tu cuenta. Vamos a crear uno nuevo.");
-    showOnboardingStep(1);
-  }
-});
+obOpenBookBtn.addEventListener("click", () => openProjectSelectorMenu());
 
 document.querySelectorAll(".ob-next").forEach(btn => {
   btn.addEventListener("click", () => {
     if (currentObStep === 1 && !obBookTitle.value.trim()) {
-      alert("¡Por favor, ponle un título a tu libro!");
+      uiAlert("¡Por favor, ponle un título a tu libro!");
       return;
     }
     showOnboardingStep(currentObStep + 1);
@@ -1280,7 +2044,7 @@ magicSplitBtn.addEventListener("click", async () => {
   }
 
   if (sections.length < 2 && !isFullView) {
-    alert("No se detectaron capítulos adicionales (ej: 'Capítulo 2'). Asegúrate de escribir los títulos en líneas separadas.");
+    uiAlert("No se detectaron capítulos adicionales (ej: 'Capítulo 2'). Asegúrate de escribir los títulos en líneas separadas.");
     return;
   }
 
@@ -1289,7 +2053,7 @@ magicSplitBtn.addEventListener("click", async () => {
     confirmMsg += "\n\n⚠️ ATENCIÓN: Estás en vista completa. Esto REEMPLAZARÁ todos los capítulos actuales por estos nuevos.";
   }
 
-  const ok = confirm(confirmMsg);
+  const ok = await uiConfirm(confirmMsg);
   
   if (ok) {
     const book = getSelectedBook();
@@ -1345,7 +2109,7 @@ magicSplitBtn.addEventListener("click", async () => {
 viewAllBtn.addEventListener("click", () => {
   const book = getSelectedBook();
   if (!book) {
-    alert("Selecciona un libro primero.");
+    uiAlert("Selecciona un libro primero.");
     return;
   }
   
@@ -1371,11 +2135,11 @@ wipeChaptersBtn.addEventListener("click", async () => {
 
   const currentText = editor.innerHTML;
   if (!currentText.trim() || currentText === "(vacío)") {
-    alert("El editor está vacío. No hay nada que limpiar.");
+    uiAlert("El editor está vacío. No hay nada que limpiar.");
     return;
   }
 
-  const ok = confirm("⚠️ ¿ESTÁS SEGURO?\n\nEsto borrará todos los capítulos actuales, pero CREARÁ UN RESPALDO con todo tu texto actual para que no se pierda nada.\n\nPodrás usar ese respaldo para reorganizar el libro con la 'Varita Mágica'.");
+  const ok = await uiConfirm("⚠️ ¿ESTÁS SEGURO?\n\nEsto borrará todos los capítulos actuales, pero CREARÁ UN RESPALDO con todo tu texto actual para que no se pierda nada.\n\nPodrás usar ese respaldo para reorganizar el libro con la 'Varita Mágica'.");
   
   if (ok) {
     setStatus("Limpiando y creando respaldo...");
@@ -1418,6 +2182,144 @@ closePreviewBtn.addEventListener("click", () => {
 
 printBtn.addEventListener("click", () => {
   window.print();
+});
+
+realBookBtn?.addEventListener("click", async () => {
+  const book = getSelectedBook();
+  if (!book) {
+    uiAlert("Selecciona o crea un libro primero.");
+    return;
+  }
+  updateRealBookSoundButton();
+  if (realBookOverlay) realBookOverlay.hidden = false;
+  if (realBookPage) {
+    realBookPage.innerHTML = '<div class="realbook-loading">Generando PDF del libro...</div>';
+  }
+  try {
+    const pdfBuffer = await buildBookPdfBuffer(book);
+    await renderPdfFlipbook(pdfBuffer);
+  } catch (err) {
+    console.error(err);
+    if (realBookPage) {
+      realBookPage.innerHTML = '<div class="realbook-loading">No se pudo construir el flipbook PDF.</div>';
+    }
+    uiAlert("No se pudo crear el visor real en PDF.");
+  }
+});
+
+closeRealBookBtn?.addEventListener("click", () => {
+  if (realBookOverlay) realBookOverlay.hidden = true;
+  realBookNavLock = false;
+  if (realBookFlip) {
+    try { realBookFlip.destroy(); } catch {}
+    realBookFlip = null;
+  }
+  if (realBookPage) realBookPage.innerHTML = "";
+});
+
+realBookPrevBtn?.addEventListener("click", () => {
+  goRealBookPrev();
+});
+
+realBookNextBtn?.addEventListener("click", () => {
+  goRealBookNext();
+});
+
+realBookClickPrev?.addEventListener("click", () => goRealBookPrev());
+realBookClickNext?.addEventListener("click", () => goRealBookNext());
+
+realBookSoundBtn?.addEventListener("click", () => {
+  realBookSoundEnabled = !realBookSoundEnabled;
+  try {
+    localStorage.setItem(REALBOOK_SOUND_KEY, realBookSoundEnabled ? "1" : "0");
+  } catch {
+    // Ignore storage issues.
+  }
+  updateRealBookSoundButton();
+});
+
+document.addEventListener("keydown", (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (e.key === "Escape") closeDesktopMenus();
+
+  if (mod && e.key.toLowerCase() === "n") {
+    e.preventDefault();
+    handleFileAction("new");
+    closeDesktopMenus();
+  } else if (mod && e.key.toLowerCase() === "o") {
+    e.preventDefault();
+    handleFileAction("open");
+    closeDesktopMenus();
+  } else if (mod && e.shiftKey && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    if (getSelectedBook()) handleFileAction("saveAs").catch((error) => setStatus(error.message));
+    closeDesktopMenus();
+  } else if (mod && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    if (getSelectedBook()) saveCurrentChapter().catch((error) => setStatus(error.message));
+    closeDesktopMenus();
+  } else if (mod && e.key.toLowerCase() === "q") {
+    e.preventDefault();
+    handleFileAction("exit");
+    closeDesktopMenus();
+  } else if (mod && e.key.toLowerCase() === "w") {
+    e.preventDefault();
+    if (getSelectedBook()) handleFileAction("closeProject");
+    closeDesktopMenus();
+  }
+
+  const openItem = getOpenDesktopMenuItem();
+  if (openItem) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      moveMenuKeyboardSelection(1);
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      moveMenuKeyboardSelection(-1);
+      return;
+    }
+    if (e.key === "Enter") {
+      const activeBtn = openItem.querySelector(".desktop-menu-dropdown button.menu-kbd-active");
+      if (activeBtn) {
+        e.preventDefault();
+        activeBtn.click();
+      }
+      return;
+    }
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const order = ["file", "edit", "help"];
+      const idx = order.indexOf(openItem.dataset.menu || "file");
+      const next = e.key === "ArrowRight" ? order[(idx + 1) % order.length] : order[(idx - 1 + order.length) % order.length];
+      openDesktopMenu(next);
+      return;
+    }
+  } else if (e.altKey && !mod) {
+    const k = e.key.toLowerCase();
+    if (k === "f") { e.preventDefault(); openDesktopMenu("file"); return; }
+    if (k === "e") { e.preventDefault(); openDesktopMenu("edit"); return; }
+    if (k === "h") { e.preventDefault(); openDesktopMenu("help"); return; }
+  }
+
+  if (!realBookOverlay || realBookOverlay.hidden) return;
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    goRealBookPrev();
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    goRealBookNext();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    closeRealBookBtn?.click();
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (!desktopMenuBar) return;
+  if (!desktopMenuBar.contains(e.target)) closeDesktopMenus();
 });
 
 function renderPreview() {
@@ -1482,12 +2384,12 @@ async function startProCheckout(interval, btnId, loadingLabel) {
     if (data.url) {
       window.location.href = data.url;
     } else {
-      alert(data.error || "Error al iniciar el pago");
+      uiAlert(data.error || "Error al iniciar el pago");
       btn.textContent = loadingLabel;
       btn.disabled = false;
     }
   } catch (err) {
-    alert("Error de conexión");
+    uiAlert("Error de conexión");
     btn.textContent = loadingLabel;
     btn.disabled = false;
   }
@@ -1585,7 +2487,7 @@ chatForm.addEventListener("submit", async (event) => {
   try {
     if (mode === "sonnet" && !clientConfig.billingRelaxed) {
       const est = await postEstimate(payload);
-      const ok = window.confirm(
+      const ok = await uiConfirm(
         `Sonnet PRO: coste maximo estimado ~ US$${est.estimated_charge_usd_max}. ¿Continuar?`
       );
       if (!ok) {

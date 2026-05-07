@@ -46,7 +46,8 @@ function requirePlan(plan) {
     // Admins siempre pasan
     if (user && user.is_admin) return next();
 
-    const PLAN_HIERARCHY = { free: 0, basic: 1, pro: 2 };
+    // Compatibilidad legacy: usuarios antiguos con "basic" equivalen a PRO.
+    const PLAN_HIERARCHY = { free: 0, basic: 2, pro: 2 };
     const userLevel = PLAN_HIERARCHY[user?.plan] ?? 0;
     const requiredLevel = PLAN_HIERARCHY[plan] ?? 1;
 

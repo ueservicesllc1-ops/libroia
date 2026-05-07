@@ -4,78 +4,489 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lector | LibroAI</title>
-    <link rel="stylesheet" href="./styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         :root {
-            --r-bg: #fdfdfd;
-            --r-text: #1a1a1a;
-            --r-accent: #6366f1;
+            --page-w: 460px;
+            --page-h: 640px;
+            --page-bg: #fdf8f0;
+            --page-bg-left: #f8f3ea;
+            --text-color: #2c2416;
+            --accent: #8b6914;
+            --spine-shadow: rgba(0,0,0,0.25);
         }
+
         body {
-            background: var(--r-bg);
-            color: var(--r-text);
-            margin: 0;
-            padding: 0;
-            font-family: 'Lora', Georgia, serif;
-            line-height: 1.8;
-        }
-        .r-header {
-            position: sticky;
-            top: 0;
-            background: rgba(255,255,255,0.9);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid #eee;
-            padding: 10px 20px;
+            background: #1a1510;
+            background-image: radial-gradient(ellipse at 50% 40%, #2a2218 0%, #12100c 70%);
+            color: var(--text-color);
+            font-family: 'Lora', Georgia, 'Times New Roman', serif;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+        }
+
+        /* ── Top Bar ─────────────────────────────────────── */
+        .top-bar {
+            display: flex;
             align-items: center;
-            z-index: 100;
+            justify-content: space-between;
+            padding: 12px 30px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            z-index: 200;
+            flex-shrink: 0;
         }
-        .r-content {
-            max-width: 700px;
-            margin: 60px auto;
-            padding: 0 20px;
+        .top-bar a, .top-bar span { color: #c4b99a; text-decoration: none; font-size: 13px; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .top-bar a:hover { color: #f0e6c8; }
+        .top-bar .book-nav-title { color: #e8dcc6; font-weight: 700; font-size: 14px; letter-spacing: 0.5px; }
+        .top-bar .page-indicator { color: #8a7d66; font-size: 12px; font-weight: 500; }
+
+        /* ── Book Scene ──────────────────────────────────── */
+        .book-scene {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 1800px;
+            padding: 20px;
+            position: relative;
         }
-        .r-title {
+
+        /* Desk surface glow */
+        .book-scene::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70%;
+            height: 40%;
+            background: radial-gradient(ellipse, rgba(139,105,20,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .book-container {
+            position: relative;
+            width: calc(var(--page-w) * 2);
+            height: var(--page-h);
+            transform-style: preserve-3d;
+            transform: rotateX(3deg);
+        }
+
+        /* ── Hardcover ───────────────────────────────────── */
+        .book-cover-bg {
+            position: absolute;
+            inset: -6px;
+            background: linear-gradient(135deg, #3a2a14 0%, #5a4020 40%, #3a2a14 100%);
+            border-radius: 4px 12px 12px 4px;
+            box-shadow:
+                0 25px 60px rgba(0,0,0,0.6),
+                0 5px 15px rgba(0,0,0,0.4),
+                inset 0 0 30px rgba(0,0,0,0.3);
+            z-index: 0;
+        }
+        .book-cover-bg::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 18px;
+            background: linear-gradient(90deg, rgba(0,0,0,0.35), rgba(0,0,0,0.05));
+            border-radius: 4px 0 0 4px;
+        }
+
+        /* ── Pages ───────────────────────────────────────── */
+        .page {
+            position: absolute;
+            width: var(--page-w);
+            height: var(--page-h);
+            top: 0;
+            background: var(--page-bg);
+            overflow: hidden;
+            backface-visibility: hidden;
+        }
+
+        .page-left {
+            left: 0;
+            background: var(--page-bg-left);
+            border-right: 1px solid rgba(0,0,0,0.08);
+            border-radius: 2px 0 0 2px;
+            box-shadow: inset -15px 0 25px -15px rgba(0,0,0,0.1);
+        }
+        .page-right {
+            left: var(--page-w);
+            border-radius: 0 2px 2px 0;
+            box-shadow: inset 15px 0 25px -15px rgba(0,0,0,0.08);
+        }
+
+        /* Paper texture overlay */
+        .page::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .page-inner {
+            padding: 50px 48px 40px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ── Page content typography ─────────────────────── */
+        .page-inner .page-number {
+            position: absolute;
+            bottom: 20px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 12px;
+            color: #a09580;
+            letter-spacing: 1px;
+        }
+        .page-left .page-number { left: 48px; }
+        .page-right .page-number { right: 48px; }
+
+        .page-text {
+            flex: 1;
+            overflow: hidden;
+            font-size: 14.5px;
+            line-height: 1.85;
+            color: var(--text-color);
+            text-align: justify;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            word-break: break-word;
+            font-weight: 400;
+        }
+        .page-text p {
+            margin: 0 0 12px 0;
+            text-indent: 1.5em;
+        }
+        .page-text p:first-child { text-indent: 0; }
+
+        .page-text h1, .page-text h2, .page-text h3 {
+            font-family: 'Cormorant Garamond', serif;
+            color: #1a1208;
+            text-align: center;
+            text-indent: 0;
+            margin: 24px 0 18px;
+            line-height: 1.3;
+        }
+        .page-text h1 { font-size: 26px; font-weight: 700; }
+        .page-text h2 { font-size: 20px; font-weight: 600; border-bottom: 1px solid #d4c8a8; padding-bottom: 8px; }
+        .page-text h3 { font-size: 17px; font-weight: 600; }
+
+        /* Chapter title page */
+        .chapter-title-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+        }
+        .chapter-title-page .chapter-label {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 40px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #a09580;
+            margin-bottom: 16px;
+        }
+        .chapter-title-page .chapter-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a1208;
+            line-height: 1.2;
+        }
+        .chapter-title-page .chapter-ornament {
+            margin-top: 24px;
+            font-size: 20px;
+            color: #c4b088;
+            letter-spacing: 8px;
+        }
+
+        /* Book title page (first page) */
+        .book-title-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+        }
+        .book-title-page .ornament-top {
+            width: 100px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #b8a878, transparent);
+            margin-bottom: 30px;
+        }
+        .book-title-page h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 34px;
+            font-weight: 700;
+            color: #1a1208;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        .book-title-page .subtitle {
+            font-family: 'Lora', serif;
+            font-style: italic;
+            font-size: 15px;
+            color: #7a6d54;
+            margin-bottom: 30px;
+        }
+        .book-title-page .ornament-bottom {
+            width: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #b8a878, transparent);
+            margin-bottom: 24px;
+        }
+        .book-title-page .author {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #a09580;
+        }
+
+        /* ── Flip animation ──────────────────────────────── */
+        .flip-page {
+            position: absolute;
+            width: var(--page-w);
+            height: var(--page-h);
+            top: 0;
+            left: var(--page-w);
+            transform-origin: left center;
+            transform-style: preserve-3d;
+            z-index: 100;
+            pointer-events: none;
+            display: none;
+        }
+        .flip-page.flipping { display: block; }
+
+        .flip-front, .flip-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            overflow: hidden;
+        }
+        .flip-front {
+            background: var(--page-bg);
+            box-shadow: inset 15px 0 25px -15px rgba(0,0,0,0.08);
+            z-index: 2;
+        }
+        .flip-back {
+            background: var(--page-bg-left);
+            transform: rotateY(180deg);
+            box-shadow: inset -15px 0 25px -15px rgba(0,0,0,0.1);
+        }
+
+        .flip-page.flipping-forward {
+            animation: flipForward 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+        .flip-page.flipping-backward {
+            transform-origin: right center;
+            left: 0;
+            animation: flipBackward 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+
+        @keyframes flipForward {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(-180deg); }
+        }
+        @keyframes flipBackward {
+            0% { transform: rotateY(-180deg); }
+            100% { transform: rotateY(0deg); }
+        }
+
+        /* ── Navigation ──────────────────────────────────── */
+        .nav-zone {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 30%;
+            cursor: pointer;
+            z-index: 50;
+            transition: background 0.2s;
+        }
+        .nav-zone:hover { background: rgba(0,0,0,0.02); }
+        .nav-zone.nav-prev { left: 0; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M15 18l-6-6 6-6' stroke='%238b6914' stroke-width='2' fill='none'/%3E%3C/svg%3E") 12 12, w-resize; }
+        .nav-zone.nav-next { right: 0; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M9 6l6 6-6 6' stroke='%238b6914' stroke-width='2' fill='none'/%3E%3C/svg%3E") 12 12, e-resize; }
+
+        /* ── Bottom controls ─────────────────────────────── */
+        .bottom-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 14px 30px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+        }
+
+        .btn-nav {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #c4b99a;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        .btn-nav:hover { background: rgba(139,105,20,0.3); color: #f0e6c8; transform: scale(1.1); }
+        .btn-nav:disabled { opacity: 0.3; cursor: default; transform: none; }
+
+        .progress-track {
+            flex: 1;
+            max-width: 400px;
+            height: 4px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 2px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b6914, #c4a032);
+            border-radius: 2px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .page-count {
+            color: #8a7d66;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 12px;
+            min-width: 80px;
             text-align: center;
         }
-        .r-chapter-title {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-top: 60px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--r-accent);
-            display: inline-block;
-        }
-        .progress-bar {
+
+        /* ── Loading state ───────────────────────────────── */
+        .loading-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            height: 4px;
-            background: var(--r-accent);
-            width: 0%;
-            transition: width 0.1s;
-            z-index: 101;
+            inset: 0;
+            background: #1a1510;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(139,105,20,0.2);
+            border-top-color: #8b6914;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .loading-text {
+            margin-top: 20px;
+            color: #8a7d66;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 18px;
+            font-style: italic;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Responsive ──────────────────────────────────── */
+        @media (max-width: 1000px) {
+            :root { --page-w: 340px; --page-h: 500px; }
+            .page-inner { padding: 35px 32px 30px; }
+            .page-text { font-size: 13px; line-height: 1.75; }
+        }
+        @media (max-width: 750px) {
+            :root { --page-w: 280px; --page-h: 420px; }
+            .page-inner { padding: 28px 24px 24px; }
+            .page-text { font-size: 12px; }
+            .book-container { transform: rotateX(2deg); }
+        }
+        @media (max-width: 600px) {
+            /* Single page mode on mobile */
+            :root { --page-w: min(90vw, 360px); --page-h: calc(var(--page-w) * 1.4); }
+            .book-container { width: var(--page-w); }
+            .page-left { display: none; }
+            .page-right { left: 0; border-radius: 2px; }
+            .page-right .page-number { text-align: center; left: 0; right: 0; }
+            .book-cover-bg { border-radius: 8px; }
+            .flip-page { left: 0; }
         }
     </style>
 </head>
 <body>
-    <div class="progress-bar" id="progressBar"></div>
-    <header class="r-header">
-        <a href="/marketplace.html" style="text-decoration: none; color: var(--r-accent); font-weight: 600;">← Volver</a>
-        <div id="bookTitleNav" style="font-weight: 700; font-family: 'Plus Jakarta Sans';">LibroAI Reader</div>
-        <div id="progressText" style="font-size: 12px; color: #666;">0% leído</div>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Abriendo libro…</div>
+    </div>
+
+    <header class="top-bar">
+        <a href="/libroia/marketplace.html" id="backLink"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+        <span class="book-nav-title" id="bookNavTitle">LibroAI Reader</span>
+        <span class="page-indicator" id="pageIndicator"></span>
     </header>
 
-    <main class="r-content" id="readerBody">
-        <h1 class="r-title" id="bookMainTitle">Cargando...</h1>
-        <div id="bookChapters"></div>
-    </main>
+    <div class="book-scene" id="bookScene">
+        <div class="book-container" id="bookContainer">
+            <div class="book-cover-bg"></div>
+            <div class="page page-left" id="pageLeft">
+                <div class="page-inner">
+                    <div class="page-text" id="pageLeftContent"></div>
+                    <div class="page-number" id="pageLeftNum"></div>
+                </div>
+            </div>
+            <div class="page page-right" id="pageRight">
+                <div class="page-inner">
+                    <div class="page-text" id="pageRightContent"></div>
+                    <div class="page-number" id="pageRightNum"></div>
+                </div>
+            </div>
+
+            <!-- Flip animation layer -->
+            <div class="flip-page" id="flipPage">
+                <div class="flip-front"><div class="page-inner"><div class="page-text" id="flipFrontContent"></div></div></div>
+                <div class="flip-back"><div class="page-inner"><div class="page-text" id="flipBackContent"></div></div></div>
+            </div>
+
+            <!-- Click zones -->
+            <div class="nav-zone nav-prev" id="navPrev" title="Página anterior"></div>
+            <div class="nav-zone nav-next" id="navNext" title="Página siguiente"></div>
+        </div>
+    </div>
+
+    <footer class="bottom-bar">
+        <button class="btn-nav" id="btnFirst" title="Primera página"><i class="fa-solid fa-angles-left"></i></button>
+        <button class="btn-nav" id="btnPrev" title="Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="progress-track" id="progressTrack">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <button class="btn-nav" id="btnNext" title="Siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+        <button class="btn-nav" id="btnLast" title="Última página"><i class="fa-solid fa-angles-right"></i></button>
+        <span class="page-count" id="pageCount">0 / 0</span>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
     <script src="./reader.js"></script>

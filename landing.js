@@ -1,5 +1,10 @@
 let currentUser = null;
 let redirectAfterLogin = null;
+const DEMO_SEED_EMAIL = "demo@libroai.app";
+
+function isSeedDemoUser(user) {
+    return !!user && String(user.email || "").trim().toLowerCase() === DEMO_SEED_EMAIL;
+}
 
 async function checkSession() {
     try {
@@ -7,6 +12,14 @@ async function checkSession() {
         const data = await res.json();
         
         if (data && data.user) {
+            if (isSeedDemoUser(data.user)) {
+                // Nunca mostrar la cuenta seed/demo en UI de usuario final.
+                await fetch('/api/auth/logout', { method: 'POST' });
+                currentUser = null;
+                document.getElementById('authBtns').style.display = 'flex';
+                document.getElementById('userMenu').style.display = 'none';
+                return;
+            }
             currentUser = data.user;
             updateUI(data.user);
         } else {

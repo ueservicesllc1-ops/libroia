@@ -63,7 +63,8 @@ app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), pay
 app.use(express.json({ limit: "2mb" }));
 
 app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  // Permite flujo de popup OAuth (Google/Firebase) sin bloquear window.close/window.closed.
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
   if (DEV) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -83,7 +84,7 @@ app.use((req, res, next) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/ai", aiGenerateRoutes);
-app.use("/api/books", createBooksRouter(DATA_DIR));
+app.use("/api/books", createBooksRouter(DATA_DIR, BOOKS_FILE));
 app.use("/api/media", mediaRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/publish", publishRoutes);

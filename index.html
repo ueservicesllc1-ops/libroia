@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LibroAI | El Renacimiento Literario</title>
+    <link rel="icon" type="image/png" href="/public/logo.png">
     <link rel="stylesheet" href="landing.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -240,11 +241,14 @@
       if (firebaseConfig.apiKey) {
           const app = initializeApp(firebaseConfig);
           const auth = getAuth(app);
+          const provider = new GoogleAuthProvider();
+          provider.addScope("email");
+          provider.addScope("profile");
 
           // Exponer globalmente para que landing.js pueda usarlos
           window.firebaseAuth = auth;
           window.firebaseSignInWithPopup = signInWithPopup;
-          window.firebaseGoogleProvider = new GoogleAuthProvider();
+          window.firebaseGoogleProvider = provider;
       }
     </script>
     <script src="landing.js"></script>

@@ -164,7 +164,7 @@ router.get("/dashboard/sales", ensureAuth, (req, res) => {
         s.*, b.title as book_title
       FROM sales s
       JOIN books_public b ON s.book_id = b.id
-      WHERE s.author_id = ?
+      WHERE s.seller_id = ?
       ORDER BY s.created_at DESC
     `).all(userId);
 

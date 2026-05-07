@@ -477,12 +477,13 @@ router.post("/webhook", async (req, res) => {
               item.seller_amount
             );
             db.prepare(
-              `UPDATE seller_balances
-             SET available_balance = available_balance + ?,
-                 lifetime_earnings = lifetime_earnings + ?,
-                 updated_at = ?
-             WHERE seller_id = ?`
-            ).run(item.seller_amount, item.seller_amount, now, item.seller_id);
+              `INSERT INTO seller_balances (seller_id, available_balance, lifetime_earnings, updated_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(seller_id) DO UPDATE SET
+                 available_balance = available_balance + excluded.available_balance,
+                 lifetime_earnings = lifetime_earnings + excluded.lifetime_earnings,
+                 updated_at = excluded.updated_at`
+            ).run(item.seller_id, item.seller_amount, item.seller_amount, now);
           }
         })();
         console.log(`[Webhook] pedido físico OK sesión ${session.id}`);
@@ -550,12 +551,13 @@ router.post("/webhook", async (req, res) => {
           );
 
           db.prepare(`
-            UPDATE seller_balances 
-            SET available_balance = available_balance + ?,
-                lifetime_earnings = lifetime_earnings + ?,
-                updated_at = ?
-            WHERE seller_id = ?
-          `).run(item.seller_amount, item.seller_amount, now, item.seller_id);
+            INSERT INTO seller_balances (seller_id, available_balance, lifetime_earnings, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(seller_id) DO UPDATE SET
+              available_balance = available_balance + excluded.available_balance,
+              lifetime_earnings = lifetime_earnings + excluded.lifetime_earnings,
+              updated_at = excluded.updated_at
+          `).run(item.seller_id, item.seller_amount, item.seller_amount, now);
         }
       })();
       console.log(`[Webhook] ✅ Compra(s) y balance procesados: ${itemsToProcess.length} item(s)`);

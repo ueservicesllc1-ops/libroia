@@ -16,7 +16,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    <link rel="stylesheet" href="/libroia/styles.css" />
+    <link rel="stylesheet" href="/libroia/styles.css?v=20260429-5" />
   </head>
   <body class="is-loading">
     <div id="loginOverlay" class="login-overlay" hidden>
@@ -204,6 +204,45 @@
     <header class="topbar">
       <div class="topbar-left">
         <div class="brand">LIBRO<span>AI</span> EDITOR</div>
+        <div class="desktop-menu" id="desktopMenuBar">
+          <div class="desktop-menu-item" data-menu="file">
+            <button class="desktop-menu-trigger" id="menuFileBtn">File</button>
+            <div class="desktop-menu-dropdown" id="menuFileDropdown">
+              <button type="button" data-file-action="new"><span>New Proyecto</span><span class="menu-shortcut">Ctrl+N</span></button>
+              <button type="button" data-file-action="save"><span>Guardar</span><span class="menu-shortcut">Ctrl+S</span></button>
+              <button type="button" data-file-action="saveAs"><span>Guardar como...</span><span class="menu-shortcut">Ctrl+Shift+S</span></button>
+              <button type="button" data-file-action="open"><span>Abrir</span><span class="menu-shortcut">Ctrl+O</span></button>
+              <div class="desktop-menu-divider"></div>
+              <div class="desktop-menu-label">Proyectos recientes</div>
+              <div id="recentProjectsWrap" class="desktop-menu-recent"></div>
+              <div class="desktop-menu-divider"></div>
+              <button type="button" data-file-action="closeProject"><span>Cerrar proyecto</span><span class="menu-shortcut">Ctrl+W</span></button>
+              <button type="button" data-file-action="exit"><span>Exit</span><span class="menu-shortcut">Ctrl+Q</span></button>
+            </div>
+          </div>
+
+          <div class="desktop-menu-item" data-menu="edit">
+            <button class="desktop-menu-trigger" id="menuEditBtn">Edit</button>
+            <div class="desktop-menu-dropdown" id="menuEditDropdown">
+              <button type="button" data-edit-action="undo"><span>Undo</span><span class="menu-shortcut">Ctrl+Z</span></button>
+              <button type="button" data-edit-action="redo"><span>Redo</span><span class="menu-shortcut">Ctrl+Y</span></button>
+              <div class="desktop-menu-divider"></div>
+              <button type="button" data-edit-action="cut"><span>Cut</span><span class="menu-shortcut">Ctrl+X</span></button>
+              <button type="button" data-edit-action="copy"><span>Copy</span><span class="menu-shortcut">Ctrl+C</span></button>
+              <button type="button" data-edit-action="paste"><span>Paste</span><span class="menu-shortcut">Ctrl+V</span></button>
+              <div class="desktop-menu-divider"></div>
+              <button type="button" data-edit-action="selectAll"><span>Select All</span><span class="menu-shortcut">Ctrl+A</span></button>
+            </div>
+          </div>
+
+          <div class="desktop-menu-item" data-menu="help">
+            <button class="desktop-menu-trigger" id="menuHelpBtn">Help</button>
+            <div class="desktop-menu-dropdown" id="menuHelpDropdown">
+              <button type="button" data-help-action="shortcuts">Atajos rápidos</button>
+              <button type="button" data-help-action="about">About LibroAI</button>
+            </div>
+          </div>
+        </div>
         <div class="status" id="statusText">Escritorio</div>
       </div>
       <div class="topbar-right">
@@ -265,8 +304,8 @@
 
           <button id="saveBookMetaBtn" class="btn btn-secondary">Guardar datos del libro</button>
           <div class="meta-actions">
-            <button id="previewBtn" class="btn btn-secondary" style="background: #1e293b; color: #fff;">👁️ Vista Impresión</button>
-            <button id="exportBtn" class="btn btn-secondary">Exportar .md</button>
+            <button id="previewBtn" class="meta-action-btn meta-action-btn--print"><i class="fa-solid fa-eye"></i> Vista de impresión</button>
+            <button id="realBookBtn" class="meta-action-btn meta-action-btn--book"><i class="fa-solid fa-book-open"></i> Ver libro real</button>
           </div>
         </div>
         <div id="bookList" class="book-list"></div>
@@ -418,6 +457,36 @@
         <!-- Las páginas se generarán aquí -->
       </div>
     </div>
+
+    <div id="realBookOverlay" class="realbook-overlay" hidden>
+      <div class="realbook-controls">
+        <button id="closeRealBookBtn" class="btn btn-secondary">← Volver a Editar</button>
+        <div class="realbook-nav">
+          <button id="realBookPrevBtn" class="btn btn-secondary">← Anterior</button>
+          <span id="realBookPageCounter" class="muted small">Página 1 de 1</span>
+          <button id="realBookNextBtn" class="btn btn-secondary">Siguiente →</button>
+          <button id="realBookSoundBtn" class="btn btn-secondary">🔊 Sonido</button>
+        </div>
+      </div>
+      <div class="realbook-stage">
+        <button id="realBookClickPrev" class="realbook-click-zone realbook-click-zone--left" aria-label="Página anterior"></button>
+        <article id="realBookPage" class="realbook-page"></article>
+        <button id="realBookClickNext" class="realbook-click-zone realbook-click-zone--right" aria-label="Página siguiente"></button>
+        <div class="realbook-hint">Usa mouse: rueda o clic en bordes · Teclado: ← → · Esc para salir</div>
+      </div>
+    </div>
+
+    <div id="uiDialogOverlay" class="ui-dialog-overlay" hidden>
+      <div class="ui-dialog-card" role="dialog" aria-modal="true" aria-labelledby="uiDialogTitle">
+        <h3 id="uiDialogTitle" class="ui-dialog-title">Mensaje</h3>
+        <p id="uiDialogMessage" class="ui-dialog-message"></p>
+        <input id="uiDialogInput" class="ui-dialog-input" type="text" hidden />
+        <div class="ui-dialog-actions">
+          <button id="uiDialogCancelBtn" class="btn btn-secondary" hidden>Cancelar</button>
+          <button id="uiDialogOkBtn" class="btn btn-primary">OK</button>
+        </div>
+      </div>
+    </div>
     <!-- Modal Planes PRO -->
     <div id="plansModal" class="plans-overlay" hidden>
       <div class="plans-modal">
@@ -469,6 +538,9 @@
 
     <!-- marked.js: renderizado de Markdown completo en el chat de IA -->
     <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
-    <script src="/libroia/app.js" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+    <script src="/libroia/app.js?v=20260429-2" type="module"></script>
   </body>
 </html>

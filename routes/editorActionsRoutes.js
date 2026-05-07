@@ -16,6 +16,21 @@ const apiKey = process.env.ANTHROPIC_API_KEY;
 // Usamos el modelo configurado en .env, no uno hardcodeado
 const getModel = () => process.env.ANTHROPIC_REFINE_MODEL || "claude-sonnet-4-5-20250929";
 
+function safeInsertBookVersion(db, { bookId, userId, actionType, contentBefore, contentAfter }) {
+  try {
+    if (!bookId) return;
+    const exists = db.prepare("SELECT id FROM books_public WHERE id = ?").get(bookId);
+    if (!exists) return;
+    db.prepare(`
+      INSERT INTO book_versions (book_id, user_id, action_type, content_before, content_after, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(bookId, userId, actionType, contentBefore, contentAfter, new Date().toISOString());
+  } catch (err) {
+    // No bloquear la respuesta principal de IA por fallos de auditoría/historial.
+    console.warn("[editorActions] No se pudo guardar book_version:", err.message);
+  }
+}
+
 /**
  * POST /api/ai/revise-chapter  [PRO]
  */
@@ -37,10 +52,13 @@ router.post("/revise-chapter", ensureAuth, requirePlan("pro"), async (req, res) 
 
     // Guardar versión
     const db = getDb();
-    db.prepare(`
-      INSERT INTO book_versions (book_id, user_id, action_type, content_before, content_after, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(book_id, req.session.userId || 1, 'revise_chapter', content, revised, new Date().toISOString());
+    safeInsertBookVersion(db, {
+      bookId: book_id,
+      userId: req.session.userId || 1,
+      actionType: "revise_chapter",
+      contentBefore: content,
+      contentAfter: revised,
+    });
 
     res.json({ revised });
   } catch (err) {
@@ -78,10 +96,13 @@ router.post("/organize-manuscript", ensureAuth, requirePlan("pro"), async (req, 
     }
 
     const db = getDb();
-    db.prepare(`
-      INSERT INTO book_versions (book_id, user_id, action_type, content_before, content_after, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(book_id, req.session.userId || 1, 'organize', content, resultText, new Date().toISOString());
+    safeInsertBookVersion(db, {
+      bookId: book_id,
+      userId: req.session.userId || 1,
+      actionType: "organize",
+      contentBefore: content,
+      contentAfter: resultText,
+    });
 
     res.json({ structured });
   } catch (err) {
