@@ -155,12 +155,13 @@ app.get("/libroia/library.html", requirePageAuth, (req, res) => res.redirect("/d
 app.get("/libroia/seller-dashboard.html", requirePageAuth, (req, res) => res.redirect("/vender-dashboard"));
 app.get("/libroia/admin.html", requirePageAuth, (req, res) => res.redirect("/admin"));
 
-app.use(express.static(__dirname));
+// Servir la carpeta de la app protegida por rutas amigables arriba
 app.use("/libroia", express.static(path.join(__dirname, "libroia")));
 app.use("/data/media", express.static(path.join(__dirname, "data", "media")));
 
-// Servir assets específicos de la landing (evita exponer .env)
+// Servir assets específicos de la landing (evita exponer .env y archivos JSON de la raíz)
 app.get("/landing.css", (req, res) => res.sendFile(path.join(__dirname, "landing.css")));
+app.get("/landing.js", (req, res) => res.sendFile(path.join(__dirname, "landing.js")));
 app.get("/libroia_elegant_wine_mockup_1777240835114.png", (req, res) => res.sendFile(path.join(__dirname, "libroia_elegant_wine_mockup_1777240835114.png")));
 app.get("/libroia_ultra_premium_mockup_1777240598297.png", (req, res) => res.sendFile(path.join(__dirname, "libroia_ultra_premium_mockup_1777240598297.png")));
 
