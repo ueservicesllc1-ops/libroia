@@ -1975,3 +1975,223 @@ body {
   .preview-content { padding: 0; display: block; overflow: visible; }
   .book-page { box-shadow: none; margin: 0; width: 100%; height: auto; page-break-after: always; }
 }
+
+/* -----------------------------------------------------------------------
+   PREMIUM READER OVERLAY
+   Design inspired by Apple Books & Kindle
+   ----------------------------------------------------------------------- */
+
+.premium-reader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.5s ease;
+  user-select: none;
+}
+
+.premium-reader-overlay.theme-light { background: #f8f1e7; color: #1e293b; }
+.premium-reader-overlay.theme-sepia { background: #f4ecd8; color: #5c4b37; }
+.premium-reader-overlay.theme-dark  { background: #0f172a; color: #f1f5f9; }
+
+.premium-reader-header {
+  height: 70px;
+  padding: 0 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0,0,0,0.03);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  z-index: 10;
+}
+
+.header-left, .header-right { display: flex; align-items: center; gap: 20px; }
+.header-info { display: flex; flex-direction: column; }
+.reader-author { font-size: 10px; font-weight: 700; letter-spacing: 2px; opacity: 0.5; text-transform: uppercase; }
+.reader-title { font-family: 'Playfair Display', serif; font-size: 16px; margin: 0; font-weight: 700; }
+
+.premium-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 50%;
+  transition: 0.3s;
+  opacity: 0.7;
+}
+.premium-btn:hover { background: rgba(0,0,0,0.05); opacity: 1; }
+
+.theme-picker { display: flex; gap: 10px; background: rgba(0,0,0,0.05); padding: 5px; border-radius: 50px; }
+.theme-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.2s; }
+.theme-btn:hover { transform: scale(1.1); }
+.theme-light { background: #f8f1e7; border-color: #ddd; }
+.theme-sepia { background: #f4ecd8; border-color: #dcd1b3; }
+.theme-dark  { background: #1e293b; border-color: #334155; }
+
+.premium-reader-stage {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow: hidden;
+}
+
+.premium-reader-page {
+  width: min(800px, 100%);
+  height: 100%;
+  background: rgba(255,255,255,0.8);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  padding: 60px 80px;
+  overflow-y: auto;
+  position: relative;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.theme-dark .premium-reader-page { background: rgba(255,255,255,0.05); }
+
+.premium-reader-content {
+  font-family: 'Lora', serif;
+  line-height: 1.85;
+  text-align: justify;
+}
+
+.premium-reader-content h1, .premium-reader-content h2 {
+  font-family: 'Playfair Display', serif;
+  text-align: center;
+  margin-bottom: 40px;
+  color: inherit;
+}
+
+.nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.03);
+  border: none;
+  color: inherit;
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+.nav-arrow:hover { background: rgba(0,0,0,0.1); transform: translateY(-50%) scale(1.1); }
+.nav-left { left: 40px; }
+.nav-right { right: 40px; }
+
+.premium-reader-footer {
+  height: 60px;
+  padding: 0 30px;
+  background: rgba(0,0,0,0.03);
+  border-top: 1px solid rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.progress-bar-container { width: 100%; height: 2px; background: rgba(0,0,0,0.1); margin-bottom: 15px; position: relative; }
+.progress-bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: #8b6914; transition: width 0.3s; }
+
+.footer-info { display: flex; justify-content: space-between; align-items: center; font-size: 11px; opacity: 0.6; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+.font-controls { display: flex; align-items: center; gap: 15px; }
+.font-controls button { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 12px; }
+
+@media (max-width: 800px) {
+  .premium-reader-page { padding: 40px 30px; }
+  .nav-arrow { display: none; }
+}
+
+/* -----------------------------------------------------------------------
+   3D REAL BOOK ENGINE STYLES
+   ----------------------------------------------------------------------- */
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(139, 105, 20, 0.3);
+  border-radius: 10px;
+}
+
+/* Efecto de degradado para el lomo del libro */
+.book-spine-shadow {
+  background: linear-gradient(to right, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%);
+}
+
+
+/* -----------------------------------------------------------------------
+   LUXURY PAGE FLIP STYLES
+   ----------------------------------------------------------------------- */
+
+.page-content-block {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  box-shadow: inset 7px 0 30px -7px rgba(0,0,0,0.2);
+}
+
+.page-content-block.bg-[#fdfaf6] {
+  background: #fdfaf6 url('https://www.transparenttextures.com/patterns/paper-fibers.png');
+}
+
+.st--portrait .page-content-block {
+  box-shadow: inset 7px 0 30px -7px rgba(0,0,0,0.2);
+}
+
+/* Ocultar el cursor original del sistema para una sensacion mas inmersiva */
+#realBookOverlay {
+  cursor: crosshair;
+}
+
+
+/* -----------------------------------------------------------------------
+   EDITORIAL TYPOGRAPHY & COMPOSITION
+   ----------------------------------------------------------------------- */
+
+.editorial-text {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+  text-rendering: optimizeLegibility;
+}
+
+.editorial-text p {
+  margin-bottom: 0 !important;
+  text-indent: 1.5em; /* Sangría clásica de párrafo */
+}
+
+.editorial-text p:first-of-type, 
+.editorial-text h3 + p {
+  text-indent: 0; /* El primer párrafo no lleva sangría */
+}
+
+.editorial-text h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8em;
+  margin-bottom: 1.5em;
+  text-align: center;
+  color: #8b6914;
+}
+

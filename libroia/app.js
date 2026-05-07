@@ -1816,59 +1816,6 @@ printBtn.addEventListener("click", () => {
   window.print();
 });
 
-realBookBtn?.addEventListener("click", async () => {
-  const book = getSelectedBook();
-  if (!book) {
-    uiAlert("Selecciona o crea un libro primero.");
-    return;
-  }
-  updateRealBookSoundButton();
-  if (realBookOverlay) realBookOverlay.hidden = false;
-  if (realBookPage) {
-    realBookPage.innerHTML = '<div class="realbook-loading">Generando PDF del libro...</div>';
-  }
-  try {
-    const pdfBuffer = await buildBookPdfBuffer(book);
-    await renderPdfFlipbook(pdfBuffer);
-  } catch (err) {
-    console.error(err);
-    if (realBookPage) {
-      realBookPage.innerHTML = '<div class="realbook-loading">No se pudo construir el flipbook PDF.</div>';
-    }
-    uiAlert("No se pudo crear el visor real en PDF.");
-  }
-});
-
-closeRealBookBtn?.addEventListener("click", () => {
-  if (realBookOverlay) realBookOverlay.hidden = true;
-  realBookNavLock = false;
-  if (realBookFlip) {
-    try { realBookFlip.destroy(); } catch {}
-    realBookFlip = null;
-  }
-  if (realBookPage) realBookPage.innerHTML = "";
-});
-
-realBookPrevBtn?.addEventListener("click", () => {
-  goRealBookPrev();
-});
-
-realBookNextBtn?.addEventListener("click", () => {
-  goRealBookNext();
-});
-
-realBookClickPrev?.addEventListener("click", () => goRealBookPrev());
-realBookClickNext?.addEventListener("click", () => goRealBookNext());
-
-realBookSoundBtn?.addEventListener("click", () => {
-  realBookSoundEnabled = !realBookSoundEnabled;
-  try {
-    localStorage.setItem(REALBOOK_SOUND_KEY, realBookSoundEnabled ? "1" : "0");
-  } catch {
-    // Ignore storage issues.
-  }
-  updateRealBookSoundButton();
-});
 
 document.addEventListener("keydown", (e) => {
   const mod = e.ctrlKey || e.metaKey;
@@ -1936,17 +1883,6 @@ document.addEventListener("keydown", (e) => {
     if (k === "h") { e.preventDefault(); openDesktopMenu("help"); return; }
   }
 
-  if (!realBookOverlay || realBookOverlay.hidden) return;
-  if (e.key === "ArrowLeft") {
-    e.preventDefault();
-    goRealBookPrev();
-  } else if (e.key === "ArrowRight") {
-    e.preventDefault();
-    goRealBookNext();
-  } else if (e.key === "Escape") {
-    e.preventDefault();
-    closeRealBookBtn?.click();
-  }
 });
 
 document.addEventListener("click", (e) => {
@@ -2223,3 +2159,24 @@ async function startApp() {
 }
 
 startApp();
+// Integracion con Premium Reader
+setTimeout(() => {
+  const realBookBtn = document.getElementById('realBookBtn');
+  if (realBookBtn) {
+    realBookBtn.addEventListener('click', () => {
+      const book = typeof getSelectedBook === 'function' ? getSelectedBook() : null;
+      if (!book) {
+        alert("Selecciona un libro primero.");
+        return;
+      }
+      
+      const overlay = document.getElementById('realBookOverlay');
+      overlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      
+      if (window.initPremiumReader) {
+        window.initPremiumReader(book);
+      }
+    });
+  }
+}, 2000);

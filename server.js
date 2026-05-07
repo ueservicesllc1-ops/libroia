@@ -1,4 +1,5 @@
 console.log("[BOOT] Iniciando proceso Node...");
+require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const session = require("express-session");
@@ -14,19 +15,6 @@ app.get("/health", (req, res) => res.status(200).send("OK"));
 
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "2mb" }));
-
-// CSP & Security Header FIX
-app.use((req, res, next) => {
-  res.setHeader("Content-Security-Policy", 
-    "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-    "connect-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-    "img-src * data: blob:; " +
-    "frame-src *; " +
-    "style-src * 'unsafe-inline';"
-  );
-  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
-  next();
-});
 
 app.use(session({
   name: "libro.sid",
