@@ -42,6 +42,10 @@ app.use(helmet({
   crossOriginOpenerPolicy: false,
 }));
 
+// ── Trust proxy (Railway / Render / Heroku usan reverse proxy) ──────────────
+// Sin esto, express-session no envía cookies secure=true porque no detecta HTTPS
+app.set("trust proxy", 1);
+
 app.use(
   session({
     name: SESSION_NAME,
@@ -51,8 +55,8 @@ app.use(
     cookie: {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: "lax",
-      secure: DEV ? false : (process.env.NODE_ENV === "production"),
+      sameSite: DEV ? "lax" : "none",
+      secure: !DEV,        // true en producción (Railway siempre HTTPS)
     },
   })
 );
