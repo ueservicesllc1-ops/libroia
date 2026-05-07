@@ -305,7 +305,6 @@
           <button id="saveBookMetaBtn" class="btn btn-secondary">Guardar datos del libro</button>
           <div class="meta-actions">
             <button id="previewBtn" class="meta-action-btn meta-action-btn--print"><i class="fa-solid fa-eye"></i> Vista de impresión</button>
-            <button id="realBookBtn" class="meta-action-btn meta-action-btn--book"><i class="fa-solid fa-book-open"></i> Ver libro real</button>
           </div>
         </div>
         <div id="bookList" class="book-list"></div>
@@ -458,23 +457,6 @@
       </div>
     </div>
 
-    <div id="realBookOverlay" class="realbook-overlay" hidden>
-      <div class="realbook-controls">
-        <button id="closeRealBookBtn" class="btn btn-secondary">← Volver a Editar</button>
-        <div class="realbook-nav">
-          <button id="realBookPrevBtn" class="btn btn-secondary">← Anterior</button>
-          <span id="realBookPageCounter" class="muted small">Página 1 de 1</span>
-          <button id="realBookNextBtn" class="btn btn-secondary">Siguiente →</button>
-          <button id="realBookSoundBtn" class="btn btn-secondary">🔊 Sonido</button>
-        </div>
-      </div>
-      <div class="realbook-stage">
-        <button id="realBookClickPrev" class="realbook-click-zone realbook-click-zone--left" aria-label="Página anterior"></button>
-        <article id="realBookPage" class="realbook-page"></article>
-        <button id="realBookClickNext" class="realbook-click-zone realbook-click-zone--right" aria-label="Página siguiente"></button>
-        <div class="realbook-hint">Usa mouse: rueda o clic en bordes · Teclado: ← → · Esc para salir</div>
-      </div>
-    </div>
 
     <div id="uiDialogOverlay" class="ui-dialog-overlay" hidden>
       <div class="ui-dialog-card" role="dialog" aria-modal="true" aria-labelledby="uiDialogTitle">
@@ -539,8 +521,6 @@
     <!-- marked.js: renderizado de Markdown completo en el chat de IA -->
     <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
     <script src="/libroia/app.js?v=20260429-2" type="module"></script>
   </body>
 </html>
