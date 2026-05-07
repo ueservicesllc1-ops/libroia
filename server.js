@@ -75,6 +75,10 @@ try {
     app.use(express.static(__dirname, { index: false }));
     app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
     app.get("/dashboard", (req, res) => res.sendFile(path.join(__dirname, "libroia", "library.html")));
+    app.get("/vender", (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-apply.html")));
+    app.get("/vender-dashboard", (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-dashboard.html")));
+    app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "libroia", "admin.html")));
+    app.get("/escribir", (req, res) => res.sendFile(path.join(__dirname, "libroia", "app.html")));
 } catch (e) {
     console.error("[BOOT ERROR] Error crítico en carga:", e);
 }
