@@ -1,18 +1,18 @@
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
 const fs = require("fs/promises");
-const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
-const { envBool } = require("./lib/envFlags");
 
 const { initDb } = require("./lib/billing/db");
+const { envBool } = require("./lib/envFlags");
+
+// Importar rutas
 const authRoutes = require("./routes/authRoutes");
 const billingRoutes = require("./routes/billingRoutes");
 const aiGenerateRoutes = require("./routes/aiGenerateRoutes");
 const { createBooksRouter } = require("./routes/booksRoutes");
-const stripeWebhookRaw = require("./routes/stripeWebhookRaw");
 const mediaRoutes = require("./routes/mediaRoutes");
 const marketplaceRoutes = require("./routes/marketplaceRoutes");
 const publishRoutes = require("./routes/publishRoutes");
@@ -23,68 +23,41 @@ const sellerRoutes = require("./routes/sellerRoutes");
 const buyerRoutes = require("./routes/buyerRoutes");
 
 const app = express();
-
 const DEV = process.env.NODE_ENV === "development";
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
 const BOOKS_FILE = path.join(DATA_DIR, "books.json");
-const SESSION_NAME = "libro.sid";
 
-const requirePageAuth = (req, res, next) => {
-  if (req.session && req.session.userId) return next();
-  return res.redirect("/");
-};
-
-// ── Cabeceras de seguridad HTTP (helmet) ──────────────────────────────────────
+// ── Configuración de Seguridad y Proxy ────────────────────────────────────────
+app.set("trust proxy", 1);
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: false,
+  crossOriginOpenerPolicy: false, 
 }));
 
-// ── Trust proxy (Railway / Render / Heroku usan reverse proxy) ──────────────
-// Sin esto, express-session no envía cookies secure=true porque no detecta HTTPS
-app.set("trust proxy", 1);
-
-app.use(
-  session({
-    name: SESSION_NAME,
-    secret: process.env.SESSION_SECRET || "cambia-esto-en-produccion",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: DEV ? "lax" : "none",
-      secure: !DEV,        // true en producción (Railway siempre HTTPS)
-    },
-  })
-);
-
-// Webhook de Stripe (Raw Body)
-app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), paymentRoutes);
-
-app.use(express.json({ limit: "2mb" }));
-
 app.use((req, res, next) => {
-  // Cambiado a unsafe-none para máxima compatibilidad con popups de Firebase/Google en producción
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
-  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
-  
-  if (DEV) {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  }
-  const p = req.originalUrl.split("?")[0];
-  if (p.startsWith("/api")) {
-    res.setHeader("X-LibroAI", "1");
-  }
   next();
 });
 
-// Protector global contra cierres inesperados
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[CRASH PREVENTION] Unhandled Rejection at:", promise, "reason:", reason);
-});
+// ── Sesiones ──────────────────────────────────────────────────────────────────
+app.use(session({
+  name: "libro.sid",
+  secret: process.env.SESSION_SECRET || "libroai-secret-key-123",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: DEV ? "lax" : "none",
+    secure: !DEV,
+  },
+}));
+
+// ── Middleware Base ───────────────────────────────────────────────────────────
+app.use("/api/payments/webhook", express.raw({ type: 'application/json' }), paymentRoutes);
+app.use(express.json({ limit: "2mb" }));
 
 // ── Rutas API ─────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
@@ -100,17 +73,14 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/seller", sellerRoutes);
 app.use("/api/buyer", buyerRoutes);
 
-app.get("/api/health", (req, res) => {
-  res.json({ ok: true, ts: new Date().toISOString() });
-});
+app.get("/api/health", (req, res) => res.json({ ok: true, node_env: process.env.NODE_ENV }));
 
 app.get("/api/config/public", (req, res) => {
-  const shipCents = Math.max(0, parseInt(process.env.PHYSICAL_SHIPPING_FLAT_CENTS || "999", 10));
   res.json({
     skipAuth: envBool("SKIP_AUTH"),
     billingRelaxed: envBool("BILLING_RELAXED"),
     googleClientId: process.env.GOOGLE_CLIENT_ID || "",
-    physicalShippingCents: shipCents,
+    physicalShippingCents: parseInt(process.env.PHYSICAL_SHIPPING_FLAT_CENTS || "999", 10),
   });
 });
 
@@ -126,59 +96,42 @@ app.get("/api/config/firebase", (req, res) => {
   });
 });
 
-// Rutas Amigables (HTML) - Colocar ANTES de express.static para que los manejadores tengan prioridad
+// ── Rutas de Navegación ───────────────────────────────────────────────────────
+const requirePageAuth = (req, res, next) => {
+  if (req.session && req.session.userId) return next();
+  res.redirect("/");
+};
+
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
-app.get("/escribir", (req, res) => {
-  const uid = req.session.userId;
-  if (!uid) return res.redirect("/");
-  
-  const { getDb } = require("./lib/billing/db");
-  const db = getDb();
-  const user = db.prepare("SELECT is_seller, is_admin FROM users WHERE id = ?").get(uid);
-  
-  if (!user || (!user.is_seller && !user.is_admin)) {
-    return res.redirect("/dashboard");
-  }
+app.get("/escribir", requirePageAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "libroia", "app.html"));
 });
 
-app.get("/libroia", (req, res) => res.redirect("/escribir"));
-app.get("/libroia/", (req, res) => res.redirect("/escribir"));
 app.get("/dashboard", requirePageAuth, (req, res) => res.sendFile(path.join(__dirname, "libroia", "library.html")));
 app.get("/admin", requirePageAuth, (req, res) => res.sendFile(path.join(__dirname, "libroia", "admin.html")));
-app.get("/library", requirePageAuth, (req, res) => res.redirect("/dashboard"));
 app.get("/vender", (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-apply.html")));
 app.get("/vender-dashboard", requirePageAuth, (req, res) => res.sendFile(path.join(__dirname, "libroia", "seller-dashboard.html")));
 
-// Bloquear accesos directos a HTML internos cuando no hay sesión.
-app.get("/libroia/app.html", requirePageAuth, (req, res) => res.redirect("/escribir"));
-app.get("/libroia/library.html", requirePageAuth, (req, res) => res.redirect("/dashboard"));
-app.get("/libroia/seller-dashboard.html", requirePageAuth, (req, res) => res.redirect("/vender-dashboard"));
-app.get("/libroia/admin.html", requirePageAuth, (req, res) => res.redirect("/admin"));
-
-// Servir la carpeta de la app protegida por rutas amigables arriba
+// ── Archivos Estáticos ────────────────────────────────────────────────────────
 app.use("/libroia", express.static(path.join(__dirname, "libroia")));
 app.use("/data/media", express.static(path.join(__dirname, "data", "media")));
+app.use(express.static(__dirname, { index: false })); // Servir archivos de la raíz pero no index.html (ya tiene ruta)
 
-// Servir assets específicos de la landing (evita exponer .env y archivos JSON de la raíz)
-app.get("/landing.css", (req, res) => res.sendFile(path.join(__dirname, "landing.css")));
-app.get("/landing.js", (req, res) => res.sendFile(path.join(__dirname, "landing.js")));
-app.get("/libroia_elegant_wine_mockup_1777240835114.png", (req, res) => res.sendFile(path.join(__dirname, "libroia_elegant_wine_mockup_1777240835114.png")));
-app.get("/libroia_ultra_premium_mockup_1777240598297.png", (req, res) => res.sendFile(path.join(__dirname, "libroia_ultra_premium_mockup_1777240598297.png")));
-
-// ── Inicialización ────────────────────────────────────────────────────────────
-(async () => {
+// ── Inicio del Servidor ───────────────────────────────────────────────────────
+async function start() {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.mkdir(path.join(DATA_DIR, "media"), { recursive: true });
     initDb(DATA_DIR);
-    console.log("Database initialized.");
-    
-    app.listen(PORT, () => {
-      console.log(`LibroAI running on http://localhost:${PORT}`);
-    });
+    console.log("[OK] Base de datos y carpetas listas.");
   } catch (err) {
-    console.error("Startup error:", err);
+    console.error("[ERROR] Error en el inicio de datos:", err);
   }
-})();
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[READY] Servidor escuchando en puerto ${PORT}`);
+  });
+}
+
+start();
